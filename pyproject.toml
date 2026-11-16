@@ -48,6 +48,7 @@ max-complexity = 5
 [tool.mypy]
 strict = true
 files = ["src", "tests"]
+mypy_path = "$MYPY_CONFIG_FILE_DIR/src"
 
 [tool.pytest.ini_options]
 addopts = [
