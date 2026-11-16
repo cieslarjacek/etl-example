@@ -6,7 +6,7 @@ description = """\
     and summarise survey waves."""
 readme = "README.md"
 authors = [{ name = "Jacek Cieślar" }]
-requires-python = ">=3.15"
+requires-python = ">=3.14"
 dependencies = [
     "pydantic>=2.14.3",
 ]

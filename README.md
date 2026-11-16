@@ -5,7 +5,7 @@ and summarise survey waves.
 
 ## Development
 
-Requires [uv](https://docs.astral.sh/uv/). It installs Python 3.15
+Requires [uv](https://docs.astral.sh/uv/). It installs Python 3.14
 from `.python-version`.
 
 ```bash
