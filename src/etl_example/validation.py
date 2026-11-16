@@ -1,12 +1,15 @@
 """Validation of raw survey rows where they enter the application.
 
-Each row is validated on its own, so one bad row is dropped and
-reported instead of rejecting the whole batch.
+Every row runs through a sequence of checks. A check returns the row
+or a ``Rejection``. The first rejection stops the row: it is reported as
+invalid and not passed on.
+A row that passes every check is appended to the valid rows, which
+later checks see, so a repeated respondent ID keeps its first row.
 """
 
 import datetime
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Annotated, Any, Final
 
@@ -19,15 +22,22 @@ from pydantic import (
     create_model,
 )
 
-from etl_example.reports import IssueReason, RowIssue, in_batch_order
-from etl_example.survey import LAYOUT, SurveyLayout
+from etl_example.invalidation_reports import InvalidRow, IssueReason
+from etl_example.survey_layout import LAYOUT, SurveyLayout
 
 __all__ = [
+    "ROW_CHECKS",
     "ROW_MODEL",
+    "CheckedRow",
+    "Rejection",
+    "RowCheck",
     "RowValidator",
     "ValidRow",
     "ValidationResult",
     "build_row_model",
+    "check_minimum_age",
+    "check_unique_id",
+    "check_values",
 ]
 
 # A 0-1 survey answer. None means the question was not answered.
@@ -86,7 +96,7 @@ ROW_MODEL: Final = build_row_model()
 
 @dataclass(frozen=True, slots=True)
 class ValidRow:
-    """A row that passed validation.
+    """A row that passed every check.
 
     Attributes:
         row_number: 1-based position of the row in the batch.
@@ -100,35 +110,56 @@ class ValidRow:
 
 
 @dataclass(frozen=True, slots=True)
+class CheckedRow:
+    """A row on its way through the checks.
+
+    Attributes:
+        row_number: 1-based position of the row in the batch.
+        received_values: The row's values as received.
+        values: The values so far; typed after ``check_values``.
+    """
+
+    row_number: int
+    received_values: Mapping[str, object]
+    values: Mapping[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class Rejection:
+    """Why a check rejected a row.
+
+    Attributes:
+        reason: Category of the problem.
+        details: Human-readable description.
+    """
+
+    reason: IssueReason
+    details: str
+
+
+type RowCheck = Callable[
+    [CheckedRow, Sequence[ValidRow]], CheckedRow | Rejection
+]
+
+
+@dataclass(frozen=True, slots=True)
 class ValidationResult:
-    """Rows that passed validation and issues of the rows that failed.
+    """Rows that passed every check and rows that were rejected.
 
     Attributes:
         valid_rows: Valid rows in batch order.
-        invalid_rows: Rejected rows with the issue reason per row.
+        invalid_rows: Rejected rows with the reason, in batch order.
     """
 
     valid_rows: tuple[ValidRow, ...]
-    invalid_rows: tuple[RowIssue, ...]
+    invalid_rows: tuple[InvalidRow, ...]
 
 
-class _RowRejectedError(ValueError):
-    """A row failed validation - carries the issue reason and detail."""
-
-    def __init__(self, reason: IssueReason, detail: str) -> None:
-        """Store why the row was rejected.
-
-        Args:
-            reason: Category of the problem.
-            detail: Human-readable description.
-        """
-        super().__init__(reason, detail)
-        self.reason = reason
-        self.detail = detail
-
-    def __str__(self) -> str:
-        """Combine the reason and the detail."""
-        return f"{self.reason}: {self.detail}"
+def _integer_or_none(value: object) -> int | None:
+    """Return the value if it is an int but not a bool, else None."""
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    return None
 
 
 def _describe_errors(error: ValidationError) -> str:
@@ -139,116 +170,172 @@ def _describe_errors(error: ValidationError) -> str:
     )
 
 
+def check_values(
+    row: CheckedRow,
+    valid_rows: Sequence[ValidRow],
+    row_model: type[BaseModel] = ROW_MODEL,
+) -> CheckedRow | Rejection:
+    """Check types and ranges.
+
+    Important: Date string is parsed to `datetime.date` type.
+
+    Args:
+        row: Row to check, with its values as received.
+        valid_rows: Rows accepted so far (not used by this check).
+        row_model: Pydantic model of one row.
+
+    Returns:
+        The row with typed values or the rejection.
+    """
+    try:
+        # Strict mode accepts only a real dict, not a read-only mapping.
+        model = row_model.model_validate(dict(row.received_values))
+    except ValidationError as error:
+        return Rejection(IssueReason.INVALID_VALUE, _describe_errors(error))
+
+    return replace(row, values=MappingProxyType(model.model_dump()))
+
+
+def check_minimum_age(
+    row: CheckedRow,
+    valid_rows: Sequence[ValidRow],
+    layout: SurveyLayout = LAYOUT,
+) -> CheckedRow | Rejection:
+    """Reject respondents younger than the youngest age category.
+
+    Runs after ``check_values``: it needs the parsed interview date.
+
+    Args:
+        row: Row to check, with typed values.
+        valid_rows: Rows accepted so far (not used by this check).
+        layout: Survey layout declaring the columns and age bands.
+
+    Returns:
+        The unchanged row or the rejection.
+    """
+    interview_date: datetime.date = row.values[layout.columns.interview_date]
+    age = interview_date.year - row.values[layout.columns.birth_year]
+    if age < layout.minimum_age:
+        return Rejection(
+            IssueReason.UNDERAGE,
+            f"age {age} in interview year is below the minimum age "
+            f"{layout.minimum_age}",
+        )
+
+    return row
+
+
+def check_unique_id(
+    row: CheckedRow,
+    valid_rows: Sequence[ValidRow],
+    layout: SurveyLayout = LAYOUT,
+) -> CheckedRow | Rejection:
+    """Reject a respondent ID already accepted earlier in the batch.
+
+    Runs after ``check_values``: it needs the typed respondent ID.
+
+    Args:
+        row: Row to check, with typed values.
+        valid_rows: Rows accepted so far.
+        layout: Survey layout declaring the respondent ID column.
+
+    Returns:
+        The unchanged row or the rejection.
+    """
+    respondent_id = row.values[layout.columns.respondent_id]
+    if any(valid.respondent_id == respondent_id for valid in valid_rows):
+        return Rejection(
+            IssueReason.DUPLICATED_ID,
+            "respondent ID repeated earlier in the batch",
+        )
+
+    return row
+
+
+# Order matters: the later checks need the typed values.
+ROW_CHECKS: Final[tuple[RowCheck, ...]] = (
+    check_values,
+    check_minimum_age,
+    check_unique_id,
+)
+
+
 class RowValidator:
-    """Validates raw rows against a survey layout."""
+    """Runs every row through the checks, in order."""
 
     def __init__(
         self,
-        row_model: type[BaseModel] = ROW_MODEL,
+        checks: Sequence[RowCheck] = ROW_CHECKS,
         layout: SurveyLayout = LAYOUT,
     ) -> None:
-        """Store the row model and the survey layout.
+        """Store the checks and the survey layout.
 
         Args:
-            row_model: Pydantic model of one row.
-            layout: Survey layout the model was built from.
+            checks: Sequence of checks every row must pass (in order).
+            layout: Survey layout including the respondent ID column.
         """
-        self._row_model = row_model
+        self._checks = tuple(checks)
         self._layout = layout
 
     def validate(
         self, raw_rows: Sequence[Mapping[str, object]]
     ) -> ValidationResult:
-        """Validate every row and drop .
+        """Validate every row, keeping valid and invalid rows apart.
 
         Args:
             raw_rows: Rows decoded from the request body.
 
         Returns:
-            The valid rows and one issue per rejected row.
+            The valid rows and the invalid rows, each in batch order.
         """
         valid_rows: list[ValidRow] = []
-        invalid_rows: list[RowIssue] = []
+        invalid_rows: list[InvalidRow] = []
+
         for row_number, raw_row in enumerate(raw_rows, start=1):
-            try:
-                valid_rows.append(self._validate_row(row_number, raw_row))
-            except _RowRejectedError as rejection:
-                respondent_id = _respondent_id_of(raw_row, self._layout)
+            frozen_row = MappingProxyType(dict(raw_row))
+            # Create the row's starting state for the checks.
+            checked_row = CheckedRow(row_number, frozen_row, frozen_row)
+
+            check_outcome = self._run_checks(checked_row, valid_rows)
+            if isinstance(check_outcome, Rejection):
                 invalid_rows.append(
-                    RowIssue(
-                        row_number,
-                        respondent_id,
-                        rejection.reason,
-                        rejection.detail,
-                    )
+                    self._invalid_row(checked_row, check_outcome)
                 )
-        unique_rows, duplicate_issues = _drop_repeated_ids(valid_rows)
+                continue
+            valid_rows.append(self._valid_row(check_outcome))
 
-        return ValidationResult(
-            tuple(unique_rows), in_batch_order(invalid_rows + duplicate_issues)
+        return ValidationResult(tuple(valid_rows), tuple(invalid_rows))
+
+    def _run_checks(
+        self, row: CheckedRow, valid_rows: Sequence[ValidRow]
+    ) -> CheckedRow | Rejection:
+        """Pass the row through the checks until one rejects it."""
+        for check in self._checks:
+            outcome = check(row, valid_rows)
+            if isinstance(outcome, Rejection):
+                return outcome
+            row = outcome
+
+        return row
+
+    def _valid_row(self, row: CheckedRow) -> ValidRow:
+        """Turn a row that passed every check into a valid row."""
+        respondent_id = row.values[self._layout.columns.respondent_id]
+
+        return ValidRow(row.row_number, respondent_id, row.values)
+
+    def _invalid_row(
+        self, row: CheckedRow, rejection: Rejection
+    ) -> InvalidRow:
+        """Turn a rejected row into an invalid row for the report."""
+        respondent_id = row.received_values.get(
+            self._layout.columns.respondent_id
         )
 
-    def _validate_row(
-        self, row_number: int, raw_row: Mapping[str, object]
-    ) -> ValidRow:
-        """Validate the values of one row, then the respondent's age."""
-        try:
-            model = self._row_model.model_validate(raw_row)
-        except ValidationError as error:
-            raise _RowRejectedError(
-                IssueReason.INVALID_VALUE, _describe_errors(error)
-            ) from error
-        values = model.model_dump()
-        self._check_minimum_age(values)
-
-        return ValidRow(
-            row_number,
-            values[self._layout.columns.respondent_id],
-            MappingProxyType(values),
+        return InvalidRow(
+            row.row_number,
+            _integer_or_none(respondent_id),
+            row.received_values,
+            rejection.reason,
+            rejection.details,
         )
-
-    def _check_minimum_age(self, values: Mapping[str, Any]) -> None:
-        """Reject respondents younger than the youngest age category."""
-        layout = self._layout
-        interview_date: datetime.date = values[layout.columns.interview_date]
-        age = interview_date.year - values[layout.columns.birth_year]
-        if age < layout.minimum_age:
-            raise _RowRejectedError(
-                IssueReason.UNDERAGE,
-                f"age {age} in interview year is below the minimum age "
-                f"{layout.minimum_age}",
-            )
-
-
-def _respondent_id_of(
-    raw_row: Mapping[str, object], layout: SurveyLayout
-) -> int | None:
-    """Return the raw respondent ID if it is an integer."""
-    respondent_id = raw_row.get(layout.columns.respondent_id)
-    if isinstance(respondent_id, int) and not isinstance(respondent_id, bool):
-        return respondent_id
-    return None
-
-
-def _drop_repeated_ids(
-    rows: Sequence[ValidRow],
-) -> tuple[list[ValidRow], list[RowIssue]]:
-    """Keep the first row of each respondent ID and report the rest."""
-    seen_ids: set[int] = set()
-    unique_rows: list[ValidRow] = []
-    issues: list[RowIssue] = []
-    for row in rows:
-        if row.respondent_id in seen_ids:
-            issues.append(
-                RowIssue(
-                    row.row_number,
-                    row.respondent_id,
-                    IssueReason.DUPLICATE_IN_BATCH,
-                    "respondent ID repeated earlier in the batch",
-                )
-            )
-            continue
-        seen_ids.add(row.respondent_id)
-        unique_rows.append(row)
-
-    return unique_rows, issues

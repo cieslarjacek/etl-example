@@ -1,4 +1,8 @@
-from etl_example.reports import IssueReason, RowIssue, in_batch_order
+from etl_example.validation_reports import (
+    IssueReason,
+    RowIssue,
+    in_batch_order,
+)
 
 
 def test_issues_are_ordered_by_row_keeping_order_within_row() -> None:
