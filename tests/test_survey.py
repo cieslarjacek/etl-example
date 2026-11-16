@@ -6,6 +6,7 @@ from etl_example.survey import (
     LAYOUT,
     AgeCategory,
     AgeOutOfRangeError,
+    ColumnNames,
     SurveyLayout,
 )
 
@@ -60,6 +61,24 @@ def test_input_columns_start_with_respondent_fields() -> None:
         "wave",
         "birth_year",
     )
+
+
+def test_input_columns_follow_custom_column_names() -> None:
+    columns = ColumnNames(respondent_id="id", interview_date="date")
+
+    layout = SurveyLayout(("a",), ADJACENT_CATEGORIES, "%d", "%d", columns)
+
+    assert layout.input_columns[:2] == ("id", "date")
+
+
+def test_column_names_reject_a_name_used_twice() -> None:
+    with pytest.raises(ValueError, match="unique"):
+        ColumnNames(age="wave")
+
+
+def test_column_names_reject_an_empty_name() -> None:
+    with pytest.raises(ValueError, match="non-empty"):
+        ColumnNames(data_status="")
 
 
 def test_layout_rejects_repeated_brands() -> None:

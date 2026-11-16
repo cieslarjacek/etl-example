@@ -5,7 +5,7 @@ The other modules receive a ``SurveyLayout`` and iterate over it
 instead of repeating column names.
 """
 
-from dataclasses import dataclass
+from dataclasses import astuple, dataclass, field
 from itertools import pairwise
 from typing import Final
 
@@ -13,6 +13,7 @@ __all__ = [
     "LAYOUT",
     "AgeCategory",
     "AgeOutOfRangeError",
+    "ColumnNames",
     "SurveyLayout",
 ]
 
@@ -82,14 +83,10 @@ class AgeOutOfRangeError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
-class SurveyLayout:
-    """Brands, age bands, date formats and column names of a survey.
+class ColumnNames:
+    """Names of the survey columns that do not depend on the brands.
 
     Attributes:
-        brands: Brand identifiers, in reporting order.
-        age_categories: Age bands, youngest first, without gaps.
-        input_date_format: ``strptime`` format of incoming dates.
-        storage_date_format: ``strftime`` format of stored dates.
         respondent_id: Column with the respondent identifier.
         interview_date: Column with the interview date.
         wave: Column with the wave number.
@@ -99,10 +96,6 @@ class SurveyLayout:
         data_status: Column with the processing status.
     """
 
-    brands: tuple[str, ...]
-    age_categories: tuple[AgeCategory, ...]
-    input_date_format: str
-    storage_date_format: str
     respondent_id: str = "respondent_id"
     interview_date: str = "interview_date"
     wave: str = "wave"
@@ -110,6 +103,37 @@ class SurveyLayout:
     age: str = "age"
     age_category: str = "age_category"
     data_status: str = "data_status"
+
+    def __post_init__(self) -> None:
+        """Validate that the names are non-empty and distinct.
+
+        Raises:
+            ValueError: If a name is empty or used twice.
+        """
+        names = astuple(self)
+        if not all(names) or len(set(names)) != len(names):
+            raise ValueError(
+                f"column names must be non-empty and unique, found {names}"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class SurveyLayout:
+    """Brands, age bands, date formats and column names of a survey.
+
+    Attributes:
+        brands: Brand identifiers, in reporting order.
+        age_categories: Age bands, youngest first, without gaps.
+        input_date_format: ``strptime`` format of incoming dates.
+        storage_date_format: ``strftime`` format of stored dates.
+        columns: Names of the columns that do not depend on brands.
+    """
+
+    brands: tuple[str, ...]
+    age_categories: tuple[AgeCategory, ...]
+    input_date_format: str
+    storage_date_format: str
+    columns: ColumnNames = field(default_factory=ColumnNames)
 
     def __post_init__(self) -> None:
         """Validate the brands and the age bands.
@@ -166,10 +190,10 @@ class SurveyLayout:
     def input_columns(self) -> tuple[str, ...]:
         """Columns of an incoming row, in file order."""
         return (
-            self.respondent_id,
-            self.interview_date,
-            self.wave,
-            self.birth_year,
+            self.columns.respondent_id,
+            self.columns.interview_date,
+            self.columns.wave,
+            self.columns.birth_year,
             *self.answer_columns,
         )
 
