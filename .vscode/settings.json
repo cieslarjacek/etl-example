@@ -13,5 +13,12 @@
   },
   // The project environment created by `make install`. Ruff, mypy and
   // pytest then run in the versions pinned in uv.lock.
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  // Terminals of this workspace start without conda's base environment;
+  // the Python Environments extension then activates .venv in every new
+  // terminal. conda reads CONDA_<SETTING> variables; AUTO_ACTIVATE_BASE
+  // is the old name of auto_activate, accepted by old and new versions.
+  "terminal.integrated.env.linux": { "CONDA_AUTO_ACTIVATE_BASE": "false" },
+  "terminal.integrated.env.osx": { "CONDA_AUTO_ACTIVATE_BASE": "false" },
+  "terminal.integrated.env.windows": { "CONDA_AUTO_ACTIVATE_BASE": "false" }
 }
