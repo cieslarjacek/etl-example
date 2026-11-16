@@ -4,6 +4,7 @@ import pytest
 
 from etl_example.settings import (
     Environment,
+    EnvironmentVariables,
     Settings,
     UnknownEnvironmentError,
     settings_from_environ,
@@ -66,3 +67,30 @@ def test_empty_database_url_is_rejected() -> None:
 def test_unknown_log_level_is_rejected() -> None:
     with pytest.raises(ValueError, match="log_level"):
         Settings(Environment.DEV, "sqlite://", "LOUD", is_docs_enabled=True)
+
+
+def test_custom_variable_names_are_read() -> None:
+    variables = EnvironmentVariables("STAGE", "DB_URL")
+    environ = {"STAGE": "prod", "DB_URL": "sqlite:///other.db"}
+
+    settings = settings_from_environ(environ, variables=variables)
+
+    assert settings.environment is Environment.PROD
+    assert settings.database_url == "sqlite:///other.db"
+
+
+def test_empty_variable_name_is_rejected() -> None:
+    with pytest.raises(ValueError, match="must not be empty"):
+        EnvironmentVariables(environment="")
+
+
+def test_equal_variable_names_are_rejected() -> None:
+    with pytest.raises(ValueError, match="must differ"):
+        EnvironmentVariables("APP_ENV", "APP_ENV")
+
+
+def test_default_variable_names_cannot_be_changed() -> None:
+    variables = EnvironmentVariables()
+
+    with pytest.raises(AttributeError):
+        variables.environment = "OTHER"  # type: ignore[misc]

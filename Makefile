@@ -12,7 +12,7 @@ help: ## Show this help.
 install: ## Install the project and dev tools from the lockfile.
 	uv sync --locked
 
-lock: ## Re-resolve uv.lock after editing dependencies in pyproject.toml
+lock: ## Re-resolve uv.lock after editing dependencies in pyproject.toml.
 	uv lock
 
 format: ## Format code and sort imports.

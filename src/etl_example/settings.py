@@ -7,26 +7,46 @@ from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Final
 
-from pydantic import BaseModel
-
 __all__ = [
     "DEFAULT_SETTINGS",
-    "DefaultVariable",
+    "ENVIRONMENT_VARIABLES",
     "Environment",
+    "EnvironmentVariables",
     "Settings",
     "UnknownEnvironmentError",
     "settings_from_environ",
 ]
 
 
-class DefaultVariable(BaseModel):
-    """Placeholder."""
+@dataclass(frozen=True, slots=True)
+class EnvironmentVariables:
+    """Names of the environment variables the settings are read from.
+
+    Attributes:
+        environment: Variable naming the environment.
+        database_url: Optional variable overriding the database URL,
+            e.g. a PostgreSQL URL injected as a secret in prod.
+    """
 
     environment: str = "APP_ENV"
     database_url: str = "DATABASE_URL"
 
+    def __post_init__(self) -> None:
+        """Validate the variable names.
 
-DEFAULT_VARIABLES = DefaultVariable()
+        Raises:
+            ValueError: If a name is empty or both names are equal.
+        """
+        if not self.environment or not self.database_url:
+            raise ValueError("environment variable names must not be empty")
+        if self.environment == self.database_url:
+            raise ValueError(
+                f"'environment' and 'database_url' must differ, both are "
+                f"{self.environment!r}"
+            )
+
+
+ENVIRONMENT_VARIABLES: Final = EnvironmentVariables()
 
 
 class Environment(enum.StrEnum):
@@ -108,15 +128,15 @@ class UnknownEnvironmentError(ValueError):
 def settings_from_environ(
     environ: Mapping[str, str],
     defaults: Mapping[Environment, Settings] = DEFAULT_SETTINGS,
-    variables: DefaultVariable = DEFAULT_VARIABLES,
+    variables: EnvironmentVariables = ENVIRONMENT_VARIABLES,
 ) -> Settings:
     """Select the settings named by the environment variables.
 
     Args:
         environ: Environment variables, usually ``os.environ``.
-        variables: Variables naming the environment and
-            overriding the database URL.
         defaults: Settings for each environment.
+        variables: Names of the variables naming the environment and
+            overriding the database URL.
 
     Returns:
         The environment's default settings, with the database URL
