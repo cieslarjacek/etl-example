@@ -3,7 +3,7 @@ SHELL := bash
 .DEFAULT_GOAL := help
 MAKEFLAGS += --warn-undefined-variables --no-builtin-rules
 
-.PHONY: help install format lint typecheck test check
+.PHONY: help install lock format lint typecheck test check
 
 help: ## Show this help.
 	@grep -E '^[a-z-]+:.*## ' "$(firstword $(MAKEFILE_LIST))" \
@@ -11,6 +11,9 @@ help: ## Show this help.
 
 install: ## Install the project and dev tools from the lockfile.
 	uv sync --locked
+
+lock: ## Re-resolve uv.lock after editing dependencies in pyproject.toml.
+	uv lock
 
 format: ## Format code and sort imports.
 	uv run ruff check --select I --fix
