@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+# A newer push to the same pull request cancels the older run.
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false # the job never pushes
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.8"
+          enable-cache: true
+      - name: Install Python 3.15 and the locked dependencies
+        run: make install
+      - name: Lint, type-check, test and run the notebook
+        run: make check
+
+  docker:
+    name: docker
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the image
+        run: make docker-build
+      - name: Start the container in dev
+        run: make docker-run-dev
+      - name: Smoke-test the container
+        run: make smoke-test EXPECTED_DOCS_STATUS=200
+      - name: Run the curl demo with waves 1-3
+        run: make demo
+      - name: Show the container log
+        if: failure()
+        run: docker logs etl-example
+      - name: Stop the container
+        if: always()
+        run: make docker-stop || true # the container may not have started
