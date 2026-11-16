@@ -1,0 +1,17 @@
+{
+  // Format with Ruff and sort imports on save, matching `make format`.
+  // Ruff reads its settings from pyproject.toml, so the editor and CI
+  // apply the same rules.
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    },
+    // 72: docstrings and comments; 79: code (PEP 8 limits in use).
+    "editor.rulers": [72, 79]
+  },
+  // The project environment created by `make install`. Ruff, mypy and
+  // pytest then run in the versions pinned in uv.lock.
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
+}
