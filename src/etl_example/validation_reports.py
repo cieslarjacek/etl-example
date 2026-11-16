@@ -3,6 +3,7 @@
 import enum
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 __all__ = [
     "InvalidRow",
@@ -25,7 +26,7 @@ class InvalidRow:
     Attributes:
         row_number: 1-based position of the row in the batch.
         respondent_id: Respondent ID, or None if it was itself invalid.
-        values: The row's values as received.
+        values: The row's values as received, read-only.
         reason: Category of the problem.
         details: Human-readable description.
     """
@@ -35,3 +36,7 @@ class InvalidRow:
     values: Mapping[str, object]
     reason: IssueReason
     details: str
+
+    def __post_init__(self) -> None:
+        """Store a read-only copy of the values."""
+        object.__setattr__(self, "values", MappingProxyType(dict(self.values)))

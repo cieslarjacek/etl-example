@@ -22,8 +22,8 @@ from pydantic import (
     create_model,
 )
 
-from etl_example.invalidation_reports import InvalidRow, IssueReason
 from etl_example.survey_layout import LAYOUT, SurveyLayout
+from etl_example.validation_reports import InvalidRow, IssueReason
 
 __all__ = [
     "ROW_CHECKS",
@@ -177,7 +177,8 @@ def check_values(
 ) -> CheckedRow | Rejection:
     """Check types and ranges.
 
-    Important: Date string is parsed to `datetime.date` type.
+    Important: The interview date is parsed into a ``datetime.date``.
+    The other values are returned as received.
 
     Args:
         row: Row to check, with its values as received.
@@ -292,14 +293,16 @@ class RowValidator:
         invalid_rows: list[InvalidRow] = []
 
         for row_number, raw_row in enumerate(raw_rows, start=1):
-            frozen_row = MappingProxyType(dict(raw_row))
+            received_values = MappingProxyType(dict(raw_row))
             # Create the row's starting state for the checks.
-            checked_row = CheckedRow(row_number, frozen_row, frozen_row)
+            received_row = CheckedRow(
+                row_number, received_values, received_values
+            )
 
-            check_outcome = self._run_checks(checked_row, valid_rows)
+            check_outcome = self._run_checks(received_row, valid_rows)
             if isinstance(check_outcome, Rejection):
                 invalid_rows.append(
-                    self._invalid_row(checked_row, check_outcome)
+                    self._invalid_row(received_row, check_outcome)
                 )
                 continue
             valid_rows.append(self._valid_row(check_outcome))

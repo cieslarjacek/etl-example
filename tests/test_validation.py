@@ -3,7 +3,6 @@ from collections.abc import Mapping, Sequence
 from types import MappingProxyType
 
 import pytest
-from etl_example.validation_reports import IssueReason
 
 from etl_example.validation import (
     CheckedRow,
@@ -14,6 +13,7 @@ from etl_example.validation import (
     check_unique_id,
     check_values,
 )
+from etl_example.validation_reports import IssueReason
 
 VALIDATOR = RowValidator()
 
