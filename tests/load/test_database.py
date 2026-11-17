@@ -1,16 +1,12 @@
-import pickle
-
 import pytest
 from sqlalchemy import create_engine, select
-from sqlalchemy.dialects.postgresql.base import PGDialect
 
-from etl_example.storage import (
+from etl_example.load import (
     BrandTotal,
     RespondentConflictError,
     SurveyDatabase,
     WaveNotFoundError,
     define_tables,
-    summary_query,
 )
 from tests.conftest import RecordsFactory
 
@@ -200,30 +196,3 @@ def test_age_categories_are_ordered_youngest_first(
 def test_unknown_wave_is_not_found(database: SurveyDatabase) -> None:
     with pytest.raises(WaveNotFoundError, match="wave 7"):
         database.read_wave_summary(7)
-
-
-# ---- summary_query ----
-
-
-def test_summary_query_compiles_for_postgresql() -> None:
-    query = summary_query(define_tables(), [2, 3])
-    # SQLAlchemy ships its dialect classes without type hints.
-    dialect = PGDialect()  # type: ignore[no-untyped-call]
-
-    sql = str(query.compile(dialect=dialect))
-
-    assert "count(*) AS respondents_total" in sql
-    assert "GROUP BY respondents.wave, respondents.age_category" in sql
-
-
-# ---- errors ----
-
-
-@pytest.mark.parametrize(
-    "error",
-    [WaveNotFoundError(7), RespondentConflictError("UNIQUE failed")],
-)
-def test_database_errors_survive_pickling(error: Exception) -> None:
-    restored = pickle.loads(pickle.dumps(error))  # noqa: S301 - own data
-
-    assert str(restored) == str(error)

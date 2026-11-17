@@ -1,6 +1,6 @@
 import pytest
 
-from etl_example.storage import (
+from etl_example.load import (
     AgeCategorySummary,
     BrandTotal,
     WaveSummary,

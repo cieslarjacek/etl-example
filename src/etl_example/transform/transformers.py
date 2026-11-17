@@ -1,38 +1,28 @@
-"""Transformation of valid rows with pandas.
+"""Transformers: each takes a frame and returns a ``TransformOutcome``.
 
-Every transformer takes a frame and returns a ``TransformOutcome``: the
-new frame and the values it corrected. ``transform_rows`` runs the
-transformers in order. The frame index holds each row's 1-based
-position in the batch, so corrections point back to the uploaded row.
+A ``TransformOutcome`` holds the new frame and the values the
+transformer corrected; most transformers correct nothing.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Final
 
 import pandas as pd
 
 from etl_example.survey import LAYOUT, DataStatus, SurveyLayout
+from etl_example.transform.frames import NULLABLE_INTEGER
 from etl_example.transform.reports import CorrectedValue, CorrectionReason
-from etl_example.validation import ValidRow
 
 __all__ = [
-    "NULLABLE_INTEGER",
     "TRANSFORMERS",
     "TransformOutcome",
     "Transformer",
     "add_age_columns",
-    "build_frame",
     "correct_usage_without_awareness",
     "format_interview_dates",
-    "frame_to_records",
     "tag_as_new",
-    "transform_rows",
 ]
-
-# Keeps unanswered questions as integer type <NA>.
-# Plain int would turn them to float type NaN.
-NULLABLE_INTEGER: Final = pd.Int64Dtype()
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,35 +39,6 @@ class TransformOutcome:
 
 
 type Transformer = Callable[[pd.DataFrame], TransformOutcome]
-
-
-def build_frame(
-    rows: Sequence[ValidRow],
-    layout: SurveyLayout = LAYOUT,
-    integer_dtype: pd.Int64Dtype = NULLABLE_INTEGER,
-) -> pd.DataFrame:
-    """Build a frame of valid rows, indexed by row number.
-
-    Args:
-        rows: Rows that passed validation.
-        layout: Survey layout declaring the columns.
-        integer_dtype: Dtype of the integer columns.
-
-    Returns:
-        One frame row per valid row, with nullable integer columns.
-    """
-    frame = pd.DataFrame.from_records(
-        [dict(row.values) for row in rows],
-        index=[row.row_number for row in rows],
-        columns=list(layout.input_columns),
-    )
-    integer_columns = [
-        column
-        for column in layout.input_columns
-        if column != layout.columns.interview_date
-    ]
-
-    return frame.astype(dict.fromkeys(integer_columns, integer_dtype))
 
 
 def _corrections(
@@ -208,53 +169,3 @@ TRANSFORMERS: Final[tuple[Transformer, ...]] = (
     format_interview_dates,
     tag_as_new,
 )
-
-
-def transform_rows(
-    rows: Sequence[ValidRow],
-    transformers: Sequence[Transformer] = TRANSFORMERS,
-    layout: SurveyLayout = LAYOUT,
-) -> TransformOutcome:
-    """Run valid rows through every transformer, in order.
-
-    Args:
-        rows: Rows that passed validation.
-        transformers: Transformers to apply, in order.
-        layout: Survey layout declaring the columns.
-
-    Returns:
-        Rows ready to be stored, with every correction in batch order.
-    """
-    frame = build_frame(rows, layout)
-    corrections: list[CorrectedValue] = []
-
-    for transformer in transformers:
-        outcome = transformer(frame)
-        frame = outcome.frame
-        corrections += outcome.corrections
-
-    ordered_corrections = sorted(
-        corrections, key=lambda correction: correction.row_number
-    )
-
-    return TransformOutcome(frame, tuple(ordered_corrections))
-
-
-def frame_to_records(frame: pd.DataFrame) -> tuple[dict[str, object], ...]:
-    """Convert a frame to records of plain Python values.
-
-    Database drivers cannot bind pandas' missing-value marker or numpy
-    numbers, so values become Python objects and ``<NA>`` becomes None.
-
-    Args:
-        frame: Rows to convert.
-
-    Returns:
-        One dictionary per row, keyed by column name.
-    """
-    plain_frame = frame.astype(object).where(frame.notna(), None)
-
-    return tuple(
-        {str(column): value for column, value in record.items()}
-        for record in plain_frame.to_dict(orient="records")
-    )

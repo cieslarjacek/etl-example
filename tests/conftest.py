@@ -8,9 +8,9 @@ from typing import Final
 import pytest
 from sqlalchemy import create_engine
 
-from etl_example.storage import SurveyDatabase, define_tables
+from etl_example.load import SurveyDatabase, define_tables
 from etl_example.transform import frame_to_records, transform_rows
-from etl_example.validation import RowValidator
+from etl_example.validate import RowValidator
 
 VALID_RAW_ROW: Final = MappingProxyType(
     {
