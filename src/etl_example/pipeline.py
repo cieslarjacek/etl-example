@@ -2,6 +2,8 @@
 
 import logging
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from typing import Final
 
 import pandas as pd
 
@@ -22,9 +24,39 @@ from etl_example.validation import (
     received_respondent_ids,
 )
 
-__all__ = ["process_batch"]
+__all__ = ["DEFAULT_OPTIONS", "PipelineOptions", "process_batch"]
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class PipelineOptions:
+    """The steps a batch runs through and the layout they share.
+
+    Attributes:
+        checks: Row checks, in order; the stored-ID check is added
+            after them for every batch.
+        transformers: Transformers applied to the valid rows, in order.
+        layout: Survey layout declaring the columns.
+    """
+
+    checks: tuple[RowCheck, ...] = ROW_CHECKS
+    transformers: tuple[Transformer, ...] = TRANSFORMERS
+    layout: SurveyLayout = LAYOUT
+
+    def __post_init__(self) -> None:
+        """Validate that there are steps to run.
+
+        Raises:
+            ValueError: If the checks or the transformers are empty.
+        """
+        if not self.checks:
+            raise ValueError("'checks' must not be empty")
+        if not self.transformers:
+            raise ValueError("'transformers' must not be empty")
+
+
+DEFAULT_OPTIONS: Final = PipelineOptions()
 
 
 def _distinct_waves(
@@ -68,9 +100,7 @@ def _log_report(report: BatchReport) -> None:
 def process_batch(
     raw_rows: Sequence[Mapping[str, object]],
     database: SurveyDatabase,
-    checks: Sequence[RowCheck] = ROW_CHECKS,
-    transformers: Sequence[Transformer] = TRANSFORMERS,
-    layout: SurveyLayout = LAYOUT,
+    options: PipelineOptions = DEFAULT_OPTIONS,
 ) -> BatchReport:
     """Process one uploaded batch from raw rows to refreshed summaries.
 
@@ -80,9 +110,7 @@ def process_batch(
     Args:
         raw_rows: Rows decoded from the request body.
         database: Database storing respondents and summaries.
-        checks: Row checks to run before the stored-ID check.
-        transformers: Transformers to apply to the valid rows.
-        layout: Survey layout declaring the columns.
+        options: Checks, transformers and layout to use.
 
     Returns:
         Counts of received and loaded rows, the invalid rows, the
@@ -92,20 +120,26 @@ def process_batch(
         RespondentConflictError: If a concurrent batch stored one of
             the IDs between the lookup and the insert.
     """
+    layout = options.layout
     stored_ids = database.stored_respondent_ids(
         received_respondent_ids(raw_rows, layout)
     )
-    all_checks = (*checks, build_stored_id_check(stored_ids, layout))
-    validation = RowValidator(all_checks, layout).validate(raw_rows)
-    transformed = transform_rows(validation.valid_rows, transformers, layout)
-    records = frame_to_records(transformed.frame)
-    database.load_new_respondents(records)
+
+    all_checks = (*options.checks, build_stored_id_check(stored_ids, layout))
+    validation_output = RowValidator(all_checks, layout).validate(raw_rows)
+
+    transformation_output = transform_rows(
+        validation_output.valid_rows, options.transformers, layout
+    )
+    new_records = frame_to_records(transformation_output.frame)
+
+    database.load_new_respondents(new_records)
     report = BatchReport(
         rows_received=len(raw_rows),
-        rows_loaded=len(records),
-        invalid_rows=validation.invalid_rows,
-        corrected_values=transformed.corrections,
-        refreshed_waves=_distinct_waves(transformed.frame, layout),
+        rows_loaded=len(new_records),
+        invalid_rows=validation_output.invalid_rows,
+        corrected_values=transformation_output.corrections,
+        refreshed_waves=_distinct_waves(transformation_output.frame, layout),
     )
     _log_report(report)
 

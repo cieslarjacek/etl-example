@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from etl_example.database import SurveyDatabase
-from etl_example.pipeline import process_batch
+from etl_example.pipeline import PipelineOptions, process_batch
 from etl_example.transform import TransformOutcome
 from etl_example.validation import check_values
 from etl_example.validation_reports import IssueReason
@@ -109,12 +109,12 @@ def test_injected_steps_replace_the_defaults(
         dates = frame["interview_date"].astype(str).str.replace("-", "")
         return TransformOutcome(frame.assign(interview_date=dates))
 
-    report = process_batch(
-        [raw_row | {"birth_year": 2010}],
-        database,
+    options = PipelineOptions(
         checks=(check_values,),
         transformers=(add_fixed_age, keep_date_text, tag_as_new),
     )
+
+    report = process_batch([raw_row | {"birth_year": 2010}], database, options)
 
     assert report.rows_loaded == 1
     assert database.read_wave_summary(3).age_categories[0].age_category == (
@@ -159,3 +159,13 @@ def test_each_issue_is_logged_at_debug_level(
         "Row 3: brand3_usage corrected from 1 to 0 (usage_without_awareness)"
         in caplog.messages
     )
+
+
+def test_options_without_checks_are_rejected() -> None:
+    with pytest.raises(ValueError, match="'checks' must not be empty"):
+        PipelineOptions(checks=())
+
+
+def test_options_without_transformers_are_rejected() -> None:
+    with pytest.raises(ValueError, match="'transformers' must not be empty"):
+        PipelineOptions(transformers=())
