@@ -7,9 +7,9 @@ from typing import Final
 
 import pandas as pd
 
-from etl_example.batch_reports import BatchReport
-from etl_example.database import SurveyDatabase
-from etl_example.survey_layout import LAYOUT, SurveyLayout
+from etl_example.pipeline.reports import BatchReport
+from etl_example.storage import SurveyDatabase
+from etl_example.survey import LAYOUT, SurveyLayout
 from etl_example.transform import (
     TRANSFORMERS,
     Transformer,

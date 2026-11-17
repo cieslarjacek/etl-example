@@ -30,12 +30,12 @@ from sqlalchemy import (
 from sqlalchemy import func as sql_functions
 from sqlalchemy.exc import IntegrityError
 
-from etl_example.summary_reports import (
+from etl_example.storage.reports import (
     AgeCategorySummary,
     BrandTotal,
     WaveSummary,
 )
-from etl_example.survey_layout import LAYOUT, DataStatus, SurveyLayout
+from etl_example.survey import LAYOUT, DataStatus, SurveyLayout
 
 __all__ = [
     "TABLE_NAMES",

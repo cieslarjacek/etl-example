@@ -48,11 +48,11 @@ max-complexity = 5
 [tool.ruff.lint.per-file-ignores]
 # Tests: pytest's assert, no docstrings on test functions, literal
 # expected values in assertions.
-"tests/**" = ["D100", "D103", "PLR2004", "S101"]
+"tests/**" = ["D100", "D103", "D104", "PLR2004", "S101"]
 # The # SQL: comments show the plain SQL of each statement for the
 # presentation; ERA001 mistakes SQL such as COALESCE(SUM(x), 0) for
 # commented-out Python.
-"src/etl_example/database.py" = ["ERA001"]
+"src/etl_example/storage/database.py" = ["ERA001"]
 
 [tool.mypy]
 strict = true

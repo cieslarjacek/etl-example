@@ -1,7 +1,7 @@
 import pytest
 
-from etl_example.batch_reports import BatchReport
-from etl_example.validation_reports import InvalidRow, IssueReason
+from etl_example.pipeline import BatchReport
+from etl_example.validation import InvalidRow, IssueReason
 
 INVALID_ROW = InvalidRow(1, 3001, {}, IssueReason.NO_ANSWERS, "no answers")
 

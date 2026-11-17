@@ -3,6 +3,8 @@ from collections.abc import Mapping, Sequence
 import pandas as pd
 
 from etl_example.transform import (
+    CorrectedValue,
+    CorrectionReason,
     TransformOutcome,
     add_age_columns,
     build_frame,
@@ -12,7 +14,6 @@ from etl_example.transform import (
     tag_as_new,
     transform_rows,
 )
-from etl_example.transform_reports import CorrectedValue, CorrectionReason
 from etl_example.validation import RowValidator, ValidRow
 
 
