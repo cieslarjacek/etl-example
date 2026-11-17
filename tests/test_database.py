@@ -118,6 +118,27 @@ def test_conflicting_load_stores_nothing(
     assert database.read_wave_summary(3) == summary_before
 
 
+# ---- stored_respondent_ids ----
+
+
+def test_stored_respondent_ids_returns_known_subset(
+    database: SurveyDatabase,
+    raw_row: dict[str, object],
+    make_records: RecordsFactory,
+) -> None:
+    database.load_new_respondents(make_records([raw_row]))
+
+    stored_ids = database.stored_respondent_ids([3001, 9999])
+
+    assert stored_ids == frozenset({3001})
+
+
+def test_stored_respondent_ids_of_no_ids_are_empty(
+    database: SurveyDatabase,
+) -> None:
+    assert database.stored_respondent_ids([]) == frozenset()
+
+
 # ---- read_wave_summary ----
 
 
