@@ -9,6 +9,7 @@ from etl_example.validation import (
     Rejection,
     RowValidator,
     ValidRow,
+    check_has_answers,
     check_minimum_age,
     check_unique_id,
     check_values,
@@ -16,6 +17,14 @@ from etl_example.validation import (
 from etl_example.validation_reports import IssueReason
 
 VALIDATOR = RowValidator()
+UNANSWERED_COLUMNS = (
+    "brand1_awareness",
+    "brand2_awareness",
+    "brand3_awareness",
+    "brand1_usage",
+    "brand2_usage",
+    "brand3_usage",
+)
 
 
 def received(raw_row: Mapping[str, object], row_number: int = 1) -> CheckedRow:
@@ -127,6 +136,30 @@ def test_check_minimum_age_accepts_respondent_at_minimum(
     assert check_minimum_age(row, []) is row
 
 
+# ---- check_has_answers ----
+
+
+def test_check_has_answers_rejects_row_without_any_answer(
+    raw_row: dict[str, object],
+) -> None:
+    raw_row |= dict.fromkeys(UNANSWERED_COLUMNS)
+
+    outcome = check_has_answers(typed(raw_row), [])
+
+    assert outcome == Rejection(
+        IssueReason.NO_ANSWERS, "all awareness and usage answers are missing"
+    )
+
+
+def test_check_has_answers_accepts_row_with_one_answer(
+    raw_row: dict[str, object],
+) -> None:
+    raw_row |= dict.fromkeys(UNANSWERED_COLUMNS) | {"brand3_usage": 0}
+    row = typed(raw_row)
+
+    assert check_has_answers(row, []) is row
+
+
 # ---- check_unique_id ----
 
 
@@ -214,6 +247,17 @@ def test_repeated_respondent_id_keeps_first_row(
     assert [row.row_number for row in result.valid_rows] == [1]
     assert result.invalid_rows[0].row_number == 2
     assert result.invalid_rows[0].reason is IssueReason.DUPLICATED_ID
+
+
+def test_row_without_answers_does_not_block_its_id(
+    raw_row: dict[str, object],
+) -> None:
+    unanswered_first = raw_row | dict.fromkeys(UNANSWERED_COLUMNS)
+
+    result = VALIDATOR.validate([unanswered_first, raw_row])
+
+    assert result.invalid_rows[0].reason is IssueReason.NO_ANSWERS
+    assert [row.row_number for row in result.valid_rows] == [2]
 
 
 def test_rejected_row_does_not_block_its_id(

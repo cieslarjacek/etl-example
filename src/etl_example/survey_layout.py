@@ -5,6 +5,7 @@ The other modules receive a ``SurveyLayout`` and iterate over it
 instead of repeating column names.
 """
 
+import enum
 from dataclasses import astuple, dataclass, field
 from itertools import pairwise
 from typing import Final
@@ -14,8 +15,16 @@ __all__ = [
     "AgeCategory",
     "AgeOutOfRangeError",
     "ColumnNames",
+    "DataStatus",
     "SurveyLayout",
 ]
+
+
+class DataStatus(enum.StrEnum):
+    """Processing status of a stored respondent row."""
+
+    NEW = "new"
+    CURRENT = "current"
 
 
 @dataclass(frozen=True, slots=True)

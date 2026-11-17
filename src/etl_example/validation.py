@@ -35,6 +35,7 @@ __all__ = [
     "ValidRow",
     "ValidationResult",
     "build_row_model",
+    "check_has_answers",
     "check_minimum_age",
     "check_unique_id",
     "check_values",
@@ -226,6 +227,30 @@ def check_minimum_age(
     return row
 
 
+def check_has_answers(
+    row: CheckedRow,
+    valid_rows: Sequence[ValidRow],
+    layout: SurveyLayout = LAYOUT,
+) -> CheckedRow | Rejection:
+    """Reject a row without any awareness or usage answer.
+
+    Args:
+        row: Row to check, with typed values.
+        valid_rows: Rows accepted so far (not used by this check).
+        layout: Survey layout declaring the answer columns.
+
+    Returns:
+        The unchanged row or the rejection.
+    """
+    if all(row.values[column] is None for column in layout.answer_columns):
+        return Rejection(
+            IssueReason.NO_ANSWERS,
+            "all awareness and usage answers are missing",
+        )
+
+    return row
+
+
 def check_unique_id(
     row: CheckedRow,
     valid_rows: Sequence[ValidRow],
@@ -257,6 +282,7 @@ def check_unique_id(
 ROW_CHECKS: Final[tuple[RowCheck, ...]] = (
     check_values,
     check_minimum_age,
+    check_has_answers,
     check_unique_id,
 )
 
