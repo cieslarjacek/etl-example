@@ -451,7 +451,25 @@ def _replace_wave_summaries(
     #       brand3_awareness_total, brand1_usage_total,
     #       brand2_usage_total, brand3_usage_total
     #   )
-    #   SELECT ...;           -- the query of summary_query (above)
+    #   SELECT
+    #       wave,
+    #       age_category,
+    #       COUNT(*) AS respondents_total,
+    #       COALESCE(SUM(brand1_awareness), 0)
+    #           AS brand1_awareness_total,
+    #       COALESCE(SUM(brand2_awareness), 0)
+    #           AS brand2_awareness_total,
+    #       COALESCE(SUM(brand3_awareness), 0)
+    #           AS brand3_awareness_total,
+    #       COALESCE(SUM(brand1_usage), 0)
+    #           AS brand1_usage_total,
+    #       COALESCE(SUM(brand2_usage), 0)
+    #           AS brand2_usage_total,
+    #       COALESCE(SUM(brand3_usage), 0)
+    #           AS brand3_usage_total
+    #   FROM respondents
+    #   WHERE wave IN (2, 3)
+    #   GROUP BY wave, age_category;
     connection.execute(
         insert(summary).from_select(list(query.selected_columns.keys()), query)
     )
