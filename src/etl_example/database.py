@@ -2,6 +2,10 @@
 
 Built on SQLAlchemy Core, so the same statements run on SQLite here
 and on PostgreSQL (e.g. Supabase) by changing only the database URL.
+
+The ``# SQL:`` comments show the plain SQL each SQLAlchemy statement
+sends, for the column names of ``LAYOUT``. SQLAlchemy binds values as
+parameters; the comments write them inline for readability.
 """
 
 from collections.abc import Mapping, Sequence
@@ -102,6 +106,26 @@ def _define_respondents(
     """Define the table holding one row per respondent."""
     columns = layout.columns
 
+    # SQL:
+    #   CREATE TABLE respondents (
+    #       respondent_id    INTEGER NOT NULL,
+    #       interview_date   VARCHAR NOT NULL,
+    #       wave             INTEGER NOT NULL,
+    #       birth_year       INTEGER NOT NULL,
+    #       age              INTEGER NOT NULL,
+    #       age_category     VARCHAR NOT NULL,
+    #       brand1_awareness INTEGER,
+    #       brand2_awareness INTEGER,
+    #       brand3_awareness INTEGER,
+    #       brand1_usage     INTEGER,
+    #       brand2_usage     INTEGER,
+    #       brand3_usage     INTEGER,
+    #       data_status      VARCHAR NOT NULL,
+    #       PRIMARY KEY (respondent_id)
+    #   );
+    #   CREATE INDEX ix_respondents_wave ON respondents (wave);
+    #   CREATE INDEX ix_respondents_data_status
+    #       ON respondents (data_status);
     return Table(
         names.respondents,
         metadata,
@@ -120,6 +144,19 @@ def _define_wave_summary(
     metadata: MetaData, layout: SurveyLayout, names: TableNames
 ) -> Table:
     """Define the table holding totals per wave and age category."""
+    # SQL:
+    #   CREATE TABLE wave_summary (
+    #       wave                   INTEGER NOT NULL,
+    #       age_category           VARCHAR NOT NULL,
+    #       respondents_total      INTEGER NOT NULL,
+    #       brand1_awareness_total INTEGER NOT NULL,
+    #       brand2_awareness_total INTEGER NOT NULL,
+    #       brand3_awareness_total INTEGER NOT NULL,
+    #       brand1_usage_total     INTEGER NOT NULL,
+    #       brand2_usage_total     INTEGER NOT NULL,
+    #       brand3_usage_total     INTEGER NOT NULL,
+    #       PRIMARY KEY (wave, age_category)
+    #   );
     return Table(
         names.wave_summary,
         metadata,
@@ -182,6 +219,26 @@ def summary_query(
         for column in tables.layout.answer_columns
     )
 
+    # SQL (for waves 2 and 3):
+    #   SELECT
+    #       wave,
+    #       age_category,
+    #       COUNT(*) AS respondents_total,
+    #       COALESCE(SUM(brand1_awareness), 0)
+    #           AS brand1_awareness_total,
+    #       COALESCE(SUM(brand2_awareness), 0)
+    #           AS brand2_awareness_total,
+    #       COALESCE(SUM(brand3_awareness), 0)
+    #           AS brand3_awareness_total,
+    #       COALESCE(SUM(brand1_usage), 0)
+    #           AS brand1_usage_total,
+    #       COALESCE(SUM(brand2_usage), 0)
+    #           AS brand2_usage_total,
+    #       COALESCE(SUM(brand3_usage), 0)
+    #           AS brand3_usage_total
+    #   FROM respondents
+    #   WHERE wave IN (2, 3)
+    #   GROUP BY wave, age_category;
     return (
         select(
             wave,
@@ -246,6 +303,8 @@ class SurveyDatabase:
 
     def create_schema(self) -> None:
         """Create the tables that do not exist yet."""
+        # SQL: both CREATE TABLE statements above, each with
+        # IF NOT EXISTS (SQLAlchemy checks for the table first).
         self._tables.metadata.create_all(self._engine)
 
     def load_new_respondents(
@@ -264,6 +323,20 @@ class SurveyDatabase:
             RespondentConflictError: If a respondent ID is already
                 stored.
         """
+        # SQL (one transaction; the helpers show their own statements):
+        #   BEGIN;
+        #   INSERT INTO respondents (
+        #       respondent_id, interview_date, wave, birth_year, age,
+        #       age_category, brand1_awareness, brand2_awareness,
+        #       brand3_awareness, brand1_usage, brand2_usage,
+        #       brand3_usage, data_status
+        #   ) VALUES
+        #       (3001, '20260915', 3, 1990, 36, '35-44',
+        #        1, 1, 0, 1, 0, 0, 'new'),
+        #       ...;                                -- one per record
+        #   -- _waves_with_new_rows, _replace_wave_summaries,
+        #   -- _mark_rows_current
+        #   COMMIT;                     -- ROLLBACK on any error
         try:
             with self._engine.begin() as connection:
                 if records:
@@ -289,6 +362,14 @@ class SurveyDatabase:
             WaveNotFoundError: If no summary is stored for the wave.
         """
         summary = self._tables.wave_summary
+        # SQL (for wave 3):
+        #   SELECT
+        #       wave, age_category, respondents_total,
+        #       brand1_awareness_total, brand2_awareness_total,
+        #       brand3_awareness_total, brand1_usage_total,
+        #       brand2_usage_total, brand3_usage_total
+        #   FROM wave_summary
+        #   WHERE wave = 3;
         query = select(summary).where(
             summary.c[self._tables.layout.columns.wave] == wave
         )
@@ -335,6 +416,11 @@ def _waves_with_new_rows(
     """Return the waves holding rows tagged ``new``."""
     wave = tables.respondents.c[tables.layout.columns.wave]
     status = tables.respondents.c[tables.layout.columns.data_status]
+    # SQL:
+    #   SELECT DISTINCT wave
+    #   FROM respondents
+    #   WHERE data_status = 'new'
+    #   ORDER BY wave;
     query = (
         select(wave)
         .distinct()
@@ -352,10 +438,20 @@ def _replace_wave_summaries(
     if not waves:
         return
     summary = tables.wave_summary
+    # SQL (for waves 2 and 3):
+    #   DELETE FROM wave_summary WHERE wave IN (2, 3);
     connection.execute(
         delete(summary).where(summary.c[tables.layout.columns.wave].in_(waves))
     )
     query = summary_query(tables, waves)
+    # SQL (for waves 2 and 3):
+    #   INSERT INTO wave_summary (
+    #       wave, age_category, respondents_total,
+    #       brand1_awareness_total, brand2_awareness_total,
+    #       brand3_awareness_total, brand1_usage_total,
+    #       brand2_usage_total, brand3_usage_total
+    #   )
+    #   SELECT ...;           -- the query of summary_query (above)
     connection.execute(
         insert(summary).from_select(list(query.selected_columns.keys()), query)
     )
@@ -364,6 +460,9 @@ def _replace_wave_summaries(
 def _mark_rows_current(connection: Connection, tables: SurveyTables) -> None:
     """Tag every ``new`` row as ``current``."""
     status = tables.respondents.c[tables.layout.columns.data_status]
+    # SQL:
+    #   UPDATE respondents SET data_status = 'current'
+    #   WHERE data_status = 'new';
     connection.execute(
         update(tables.respondents)
         .where(status == DataStatus.NEW.value)
