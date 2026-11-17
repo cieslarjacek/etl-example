@@ -14,6 +14,10 @@
   // The project environment created by `make install`. Ruff, mypy and
   // pytest then run in the versions pinned in uv.lock.
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  // The Mypy extension runs its server in .venv and uses the project's
+  // mypy, so the editor reports the same errors as `make typecheck`.
+  "mypy-type-checker.interpreter": ["${workspaceFolder}/.venv/bin/python"],
+  "mypy-type-checker.importStrategy": "fromEnvironment",
   // Terminals of this workspace start without conda's base environment;
   // the Python Environments extension then activates .venv in every new
   // terminal. conda reads CONDA_<SETTING> variables; AUTO_ACTIVATE_BASE

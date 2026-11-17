@@ -16,6 +16,7 @@ class IssueReason(enum.StrEnum):
 
     INVALID_VALUE = "invalid_value"
     UNDERAGE = "underage"
+    NO_ANSWERS = "no_answers"
     DUPLICATED_ID = "duplicated_id"
 
 
