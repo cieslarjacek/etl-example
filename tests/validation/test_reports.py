@@ -1,6 +1,6 @@
 import pytest
 
-from etl_example.validation_reports import InvalidRow, IssueReason
+from etl_example.validation import InvalidRow, IssueReason
 
 
 def test_invalid_row_cannot_be_changed() -> None:

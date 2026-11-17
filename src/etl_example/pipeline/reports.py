@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass
 
-from etl_example.transform_reports import CorrectedValue
-from etl_example.validation_reports import InvalidRow
+from etl_example.transform import CorrectedValue
+from etl_example.validation import InvalidRow
 
 __all__ = ["BatchReport"]
 

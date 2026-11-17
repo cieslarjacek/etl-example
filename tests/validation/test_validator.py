@@ -6,6 +6,7 @@ import pytest
 
 from etl_example.validation import (
     CheckedRow,
+    IssueReason,
     Rejection,
     RowValidator,
     ValidRow,
@@ -16,7 +17,6 @@ from etl_example.validation import (
     check_values,
     received_respondent_ids,
 )
-from etl_example.validation_reports import IssueReason
 
 VALIDATOR = RowValidator()
 UNANSWERED_COLUMNS = (

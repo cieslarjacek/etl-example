@@ -4,15 +4,15 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.dialects.postgresql.base import PGDialect
 
-from conftest import RecordsFactory
-from etl_example.database import (
+from etl_example.storage import (
+    BrandTotal,
     RespondentConflictError,
     SurveyDatabase,
     WaveNotFoundError,
     define_tables,
     summary_query,
 )
-from etl_example.summary_reports import BrandTotal
+from tests.conftest import RecordsFactory
 
 
 def rows_for_wave(

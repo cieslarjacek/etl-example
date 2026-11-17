@@ -12,8 +12,8 @@ from typing import Final
 
 import pandas as pd
 
-from etl_example.survey_layout import LAYOUT, DataStatus, SurveyLayout
-from etl_example.transform_reports import CorrectedValue, CorrectionReason
+from etl_example.survey import LAYOUT, DataStatus, SurveyLayout
+from etl_example.transform.reports import CorrectedValue, CorrectionReason
 from etl_example.validation import ValidRow
 
 __all__ = [
