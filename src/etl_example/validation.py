@@ -8,7 +8,7 @@ later checks see, so a repeated respondent ID keeps its first row.
 """
 
 import datetime
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Annotated, Any, Final
@@ -35,10 +35,12 @@ __all__ = [
     "ValidRow",
     "ValidationResult",
     "build_row_model",
+    "build_stored_id_check",
     "check_has_answers",
     "check_minimum_age",
     "check_unique_id",
     "check_values",
+    "received_respondent_ids",
 ]
 
 # A 0-1 survey answer. None means the question was not answered.
@@ -276,6 +278,60 @@ def check_unique_id(
         )
 
     return row
+
+
+def build_stored_id_check(
+    stored_ids: Set[int], layout: SurveyLayout = LAYOUT
+) -> RowCheck:
+    """Build a check rejecting respondent IDs already in the database.
+
+    The stored IDs are looked up once per batch, so the check itself
+    stays pure.
+
+    Args:
+        stored_ids: Respondent IDs of the batch already stored.
+        layout: Survey layout declaring the respondent ID column.
+
+    Returns:
+        A check that runs after ``check_values``.
+    """
+
+    def check_not_stored(
+        row: CheckedRow, valid_rows: Sequence[ValidRow]
+    ) -> CheckedRow | Rejection:
+        if row.values[layout.columns.respondent_id] in stored_ids:
+            return Rejection(
+                IssueReason.DUPLICATED_ID,
+                "respondent ID already stored in the database",
+            )
+
+        return row
+
+    return check_not_stored
+
+
+def received_respondent_ids(
+    raw_rows: Sequence[Mapping[str, object]], layout: SurveyLayout = LAYOUT
+) -> frozenset[int]:
+    """Return the respondent IDs of raw rows that are integers.
+
+    Args:
+        raw_rows: Rows decoded from the request body.
+        layout: Survey layout declaring the respondent ID column.
+
+    Returns:
+        The distinct respondent IDs that are integers.
+    """
+    respondent_ids = (
+        _integer_or_none(raw_row.get(layout.columns.respondent_id))
+        for raw_row in raw_rows
+    )
+
+    return frozenset(
+        respondent_id
+        for respondent_id in respondent_ids
+        if respondent_id is not None
+    )
 
 
 # Order matters: the later checks need the typed values.

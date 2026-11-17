@@ -8,7 +8,7 @@ sends, for the column names of ``LAYOUT``. SQLAlchemy binds values as
 parameters; the comments write them inline for readability.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -306,6 +306,28 @@ class SurveyDatabase:
         # SQL: both CREATE TABLE statements above, each with
         # IF NOT EXISTS (SQLAlchemy checks for the table first).
         self._tables.metadata.create_all(self._engine)
+
+    def stored_respondent_ids(
+        self, respondent_ids: Iterable[int]
+    ) -> frozenset[int]:
+        """Return which of the given respondent IDs are already stored.
+
+        Args:
+            respondent_ids: IDs to look up.
+
+        Returns:
+            The subset of the IDs found in the respondents table.
+        """
+        id_column = self._tables.respondents.c[
+            self._tables.layout.columns.respondent_id
+        ]
+        # SQL (for IDs 1005 and 3001):
+        #   SELECT respondent_id
+        #   FROM respondents
+        #   WHERE respondent_id IN (1005, 3001);
+        query = select(id_column).where(id_column.in_(list(respondent_ids)))
+        with self._engine.connect() as connection:
+            return frozenset(connection.scalars(query))
 
     def load_new_respondents(
         self, records: Sequence[Mapping[str, object]]

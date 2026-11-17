@@ -9,10 +9,12 @@ from etl_example.validation import (
     Rejection,
     RowValidator,
     ValidRow,
+    build_stored_id_check,
     check_has_answers,
     check_minimum_age,
     check_unique_id,
     check_values,
+    received_respondent_ids,
 )
 from etl_example.validation_reports import IssueReason
 
@@ -180,6 +182,50 @@ def test_check_unique_id_accepts_new_id(raw_row: dict[str, object]) -> None:
     row = typed(raw_row)
 
     assert check_unique_id(row, [ValidRow(1, 3002, {})]) is row
+
+
+# ---- build_stored_id_check ----
+
+
+def test_stored_id_check_rejects_stored_id(
+    raw_row: dict[str, object],
+) -> None:
+    check = build_stored_id_check(frozenset({3001}))
+
+    outcome = check(typed(raw_row), [])
+
+    assert outcome == Rejection(
+        IssueReason.DUPLICATED_ID,
+        "respondent ID already stored in the database",
+    )
+
+
+def test_stored_id_check_accepts_new_id(raw_row: dict[str, object]) -> None:
+    check = build_stored_id_check(frozenset({1005}))
+    row = typed(raw_row)
+
+    assert check(row, []) is row
+
+
+# ---- received_respondent_ids ----
+
+
+def test_received_ids_leave_out_ids_that_are_not_integers(
+    raw_row: dict[str, object],
+) -> None:
+    rows: list[Mapping[str, object]] = [
+        raw_row,
+        raw_row | {"respondent_id": "R-1"},
+        raw_row | {"respondent_id": True},
+        raw_row | {"respondent_id": None},
+        {"wave": 3},
+    ]
+
+    assert received_respondent_ids(rows) == frozenset({3001})
+
+
+def test_received_ids_of_empty_batch_are_empty() -> None:
+    assert received_respondent_ids([]) == frozenset()
 
 
 # ---- RowValidator ----
