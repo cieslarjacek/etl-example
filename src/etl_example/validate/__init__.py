@@ -1,6 +1,6 @@
 """Validation of uploaded rows, one row at a time."""
 
-from etl_example.validation.checks import (
+from etl_example.validate.checks import (
     ROW_CHECKS,
     ROW_MODEL,
     CheckedRow,
@@ -14,8 +14,8 @@ from etl_example.validation.checks import (
     check_unique_id,
     check_values,
 )
-from etl_example.validation.reports import InvalidRow, IssueReason
-from etl_example.validation.validator import (
+from etl_example.validate.reports import InvalidRow, IssueReason
+from etl_example.validate.validator import (
     RowValidator,
     ValidationResult,
     received_respondent_ids,

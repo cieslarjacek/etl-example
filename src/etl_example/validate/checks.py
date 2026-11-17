@@ -20,7 +20,7 @@ from pydantic import (
 )
 
 from etl_example.survey import LAYOUT, SurveyLayout
-from etl_example.validation.reports import IssueReason
+from etl_example.validate.reports import IssueReason
 
 __all__ = [
     "ROW_CHECKS",

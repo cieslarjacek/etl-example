@@ -1,4 +1,4 @@
-"""SQL storage of respondents and per-wave summaries.
+"""Loading respondents and keeping the wave summaries up to date.
 
 Built on SQLAlchemy Core, so the same statements run on SQLite here
 and on PostgreSQL (e.g. Supabase) by changing only the database URL.
@@ -9,283 +9,29 @@ parameters; the comments write them inline for readability.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
-from typing import Any, Final
 
 from sqlalchemy import (
-    Column,
     Connection,
     Engine,
-    Integer,
-    MetaData,
     RowMapping,
-    Select,
-    String,
-    Table,
     delete,
     insert,
     select,
     update,
 )
-from sqlalchemy import func as sql_functions
 from sqlalchemy.exc import IntegrityError
 
-from etl_example.storage.reports import (
+from etl_example.load.errors import RespondentConflictError, WaveNotFoundError
+from etl_example.load.queries import summary_query
+from etl_example.load.reports import (
     AgeCategorySummary,
     BrandTotal,
     WaveSummary,
 )
-from etl_example.survey import LAYOUT, DataStatus, SurveyLayout
+from etl_example.load.tables import SurveyTables
+from etl_example.survey import DataStatus
 
-__all__ = [
-    "TABLE_NAMES",
-    "RespondentConflictError",
-    "SurveyDatabase",
-    "SurveyTables",
-    "TableNames",
-    "WaveNotFoundError",
-    "define_tables",
-    "summary_query",
-]
-
-
-@dataclass(frozen=True, slots=True)
-class TableNames:
-    """Names of the tables and of the summary count columns.
-
-    Attributes:
-        respondents: Table with one row per respondent.
-        wave_summary: Table with totals per wave and age category.
-        respondents_total: Summary column counting respondents.
-        total_suffix: Suffix turning an answer column into the
-            summary column counting its 1 answers.
-    """
-
-    respondents: str = "respondents"
-    wave_summary: str = "wave_summary"
-    respondents_total: str = "respondents_total"
-    total_suffix: str = "_total"
-
-    def total_column(self, answer_column: str) -> str:
-        """Return the summary column counting an answer column's 1s.
-
-        Args:
-            answer_column: Answer column, e.g. ``"brand2_usage"``.
-
-        Returns:
-            Summary column name, e.g. ``"brand2_usage_total"``.
-        """
-        return f"{answer_column}{self.total_suffix}"
-
-
-TABLE_NAMES: Final = TableNames()
-
-
-@dataclass(frozen=True, slots=True)
-class SurveyTables:
-    """Table definitions together with the names they were built from.
-
-    Attributes:
-        metadata: SQLAlchemy metadata holding both tables.
-        respondents: Table with one row per respondent.
-        wave_summary: Table with totals per wave and age category.
-        layout: Survey layout declaring the columns.
-        names: Table and summary column names.
-    """
-
-    metadata: MetaData
-    respondents: Table
-    wave_summary: Table
-    layout: SurveyLayout
-    names: TableNames
-
-
-def _define_respondents(
-    metadata: MetaData, layout: SurveyLayout, names: TableNames
-) -> Table:
-    """Define the table holding one row per respondent."""
-    columns = layout.columns
-
-    # SQL:
-    #   CREATE TABLE respondents (
-    #       respondent_id    INTEGER NOT NULL,
-    #       interview_date   VARCHAR NOT NULL,
-    #       wave             INTEGER NOT NULL,
-    #       birth_year       INTEGER NOT NULL,
-    #       age              INTEGER NOT NULL,
-    #       age_category     VARCHAR NOT NULL,
-    #       brand1_awareness INTEGER,
-    #       brand2_awareness INTEGER,
-    #       brand3_awareness INTEGER,
-    #       brand1_usage     INTEGER,
-    #       brand2_usage     INTEGER,
-    #       brand3_usage     INTEGER,
-    #       data_status      VARCHAR NOT NULL,
-    #       PRIMARY KEY (respondent_id)
-    #   );
-    #   CREATE INDEX ix_respondents_wave ON respondents (wave);
-    #   CREATE INDEX ix_respondents_data_status
-    #       ON respondents (data_status);
-    return Table(
-        names.respondents,
-        metadata,
-        Column(columns.respondent_id, Integer, primary_key=True),
-        Column(columns.interview_date, String, nullable=False),
-        Column(columns.wave, Integer, nullable=False, index=True),
-        Column(columns.birth_year, Integer, nullable=False),
-        Column(columns.age, Integer, nullable=False),
-        Column(columns.age_category, String, nullable=False),
-        *(Column(column, Integer) for column in layout.answer_columns),
-        Column(columns.data_status, String, nullable=False, index=True),
-    )
-
-
-def _define_wave_summary(
-    metadata: MetaData, layout: SurveyLayout, names: TableNames
-) -> Table:
-    """Define the table holding totals per wave and age category."""
-    # SQL:
-    #   CREATE TABLE wave_summary (
-    #       wave                   INTEGER NOT NULL,
-    #       age_category           VARCHAR NOT NULL,
-    #       respondents_total      INTEGER NOT NULL,
-    #       brand1_awareness_total INTEGER NOT NULL,
-    #       brand2_awareness_total INTEGER NOT NULL,
-    #       brand3_awareness_total INTEGER NOT NULL,
-    #       brand1_usage_total     INTEGER NOT NULL,
-    #       brand2_usage_total     INTEGER NOT NULL,
-    #       brand3_usage_total     INTEGER NOT NULL,
-    #       PRIMARY KEY (wave, age_category)
-    #   );
-    return Table(
-        names.wave_summary,
-        metadata,
-        Column(layout.columns.wave, Integer, primary_key=True),
-        Column(layout.columns.age_category, String, primary_key=True),
-        Column(names.respondents_total, Integer, nullable=False),
-        *(
-            Column(names.total_column(column), Integer, nullable=False)
-            for column in layout.answer_columns
-        ),
-    )
-
-
-def define_tables(
-    layout: SurveyLayout = LAYOUT, names: TableNames = TABLE_NAMES
-) -> SurveyTables:
-    """Define the respondents and wave summary tables.
-
-    Args:
-        layout: Survey layout declaring the columns.
-        names: Table and summary column names.
-
-    Returns:
-        Both tables, sharing one metadata object.
-    """
-    metadata = MetaData()
-
-    return SurveyTables(
-        metadata,
-        _define_respondents(metadata, layout, names),
-        _define_wave_summary(metadata, layout, names),
-        layout,
-        names,
-    )
-
-
-def summary_query(
-    tables: SurveyTables, waves: Sequence[int]
-) -> Select[*tuple[Any, ...]]:
-    """Build the query counting respondents and answers per wave.
-
-    ``SUM`` of a 0/1 column counts its 1 answers; unanswered questions
-    are NULL and ``SUM`` skips them. ``COALESCE`` turns the NULL sum of
-    a group without any answer into 0.
-
-    Args:
-        tables: Survey table definitions.
-        waves: Waves to summarise.
-
-    Returns:
-        A SELECT with one row per wave and age category.
-    """
-    respondents = tables.respondents
-    wave = respondents.c[tables.layout.columns.wave]
-    age_category = respondents.c[tables.layout.columns.age_category]
-    answer_totals = (
-        sql_functions.coalesce(
-            sql_functions.sum(respondents.c[column]), 0
-        ).label(tables.names.total_column(column))
-        for column in tables.layout.answer_columns
-    )
-
-    # SQL (for waves 2 and 3):
-    #   SELECT
-    #       wave,
-    #       age_category,
-    #       COUNT(*) AS respondents_total,
-    #       COALESCE(SUM(brand1_awareness), 0)
-    #           AS brand1_awareness_total,
-    #       COALESCE(SUM(brand2_awareness), 0)
-    #           AS brand2_awareness_total,
-    #       COALESCE(SUM(brand3_awareness), 0)
-    #           AS brand3_awareness_total,
-    #       COALESCE(SUM(brand1_usage), 0)
-    #           AS brand1_usage_total,
-    #       COALESCE(SUM(brand2_usage), 0)
-    #           AS brand2_usage_total,
-    #       COALESCE(SUM(brand3_usage), 0)
-    #           AS brand3_usage_total
-    #   FROM respondents
-    #   WHERE wave IN (2, 3)
-    #   GROUP BY wave, age_category;
-    return (
-        select(
-            wave,
-            age_category,
-            sql_functions.count().label(tables.names.respondents_total),
-            *answer_totals,
-        )
-        .where(wave.in_(waves))
-        .group_by(wave, age_category)
-    )
-
-
-class WaveNotFoundError(LookupError):
-    """No summary is stored for the requested wave."""
-
-    def __init__(self, wave: int) -> None:
-        """Store the wave that was requested.
-
-        Args:
-            wave: Wave number.
-        """
-        super().__init__(wave)
-        self.wave = wave
-
-    def __str__(self) -> str:
-        """Name the missing wave."""
-        return f"no summary stored for wave {self.wave}"
-
-
-class RespondentConflictError(RuntimeError):
-    """A respondent ID being stored is already in the database."""
-
-    def __init__(self, database_message: str) -> None:
-        """Store the database's description of the conflict.
-
-        Args:
-            database_message: Message of the database driver.
-        """
-        super().__init__(database_message)
-        self.database_message = database_message
-
-    def __str__(self) -> str:
-        """Explain the conflict and what was stored."""
-        return (
-            "respondent ID already stored, nothing from this batch was "
-            f"saved ({self.database_message})"
-        )
+__all__ = ["SurveyDatabase"]
 
 
 class SurveyDatabase:

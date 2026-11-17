@@ -12,14 +12,14 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from etl_example.survey import LAYOUT, SurveyLayout
-from etl_example.validation.checks import (
+from etl_example.validate.checks import (
     ROW_CHECKS,
     CheckedRow,
     Rejection,
     RowCheck,
     ValidRow,
 )
-from etl_example.validation.reports import InvalidRow
+from etl_example.validate.reports import InvalidRow
 
 __all__ = [
     "RowValidator",

@@ -3,10 +3,10 @@ import logging
 import pandas as pd
 import pytest
 
+from etl_example.load import SurveyDatabase
 from etl_example.pipeline import PipelineOptions, process_batch
-from etl_example.storage import SurveyDatabase
 from etl_example.transform import TransformOutcome
-from etl_example.validation import IssueReason, check_values
+from etl_example.validate import IssueReason, check_values
 
 UNANSWERED = {
     "brand1_awareness": None,

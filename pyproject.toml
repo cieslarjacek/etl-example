@@ -52,7 +52,7 @@ max-complexity = 5
 # The # SQL: comments show the plain SQL of each statement for the
 # presentation; ERA001 mistakes SQL such as COALESCE(SUM(x), 0) for
 # commented-out Python.
-"src/etl_example/storage/database.py" = ["ERA001"]
+"src/etl_example/load/*.py" = ["ERA001"]
 
 [tool.mypy]
 strict = true

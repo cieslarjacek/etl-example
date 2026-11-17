@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from etl_example.transform import CorrectedValue
-from etl_example.validation import InvalidRow
+from etl_example.validate import InvalidRow
 
 __all__ = ["BatchReport"]
 
