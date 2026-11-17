@@ -25,6 +25,7 @@ __all__ = [
     "build_frame",
     "correct_usage_without_awareness",
     "format_interview_dates",
+    "frame_to_records",
     "tag_as_new",
     "transform_rows",
 ]
@@ -237,3 +238,23 @@ def transform_rows(
     )
 
     return TransformOutcome(frame, tuple(ordered_corrections))
+
+
+def frame_to_records(frame: pd.DataFrame) -> tuple[dict[str, object], ...]:
+    """Convert a frame to records of plain Python values.
+
+    Database drivers cannot bind pandas' missing-value marker or numpy
+    numbers, so values become Python objects and ``<NA>`` becomes None.
+
+    Args:
+        frame: Rows to convert.
+
+    Returns:
+        One dictionary per row, keyed by column name.
+    """
+    plain_frame = frame.astype(object).where(frame.notna(), None)
+
+    return tuple(
+        {str(column): value for column, value in record.items()}
+        for record in plain_frame.to_dict(orient="records")
+    )

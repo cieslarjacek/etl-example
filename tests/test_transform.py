@@ -8,6 +8,7 @@ from etl_example.transform import (
     build_frame,
     correct_usage_without_awareness,
     format_interview_dates,
+    frame_to_records,
     tag_as_new,
     transform_rows,
 )
@@ -232,3 +233,21 @@ def test_transform_runs_injected_transformers_in_order(
     assert calls == ["first", "second after first"]
     assert outcome.frame.loc[1, "step"] == "second"
     assert outcome.corrections == (correction,)
+
+
+# ---- frame_to_records ----
+
+
+def test_records_hold_none_for_unanswered_questions(
+    raw_row: dict[str, object],
+) -> None:
+    frame = frame_of([raw_row | {"brand1_usage": None}])
+
+    records = frame_to_records(frame)
+
+    assert records[0]["brand1_usage"] is None
+    assert type(records[0]["brand1_awareness"]) is int
+
+
+def test_records_of_empty_frame_are_empty() -> None:
+    assert frame_to_records(build_frame([])) == ()
