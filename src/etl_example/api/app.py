@@ -1,7 +1,7 @@
 """The API application: settings, database, routes and error replies."""
 
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 from importlib import metadata
@@ -56,7 +56,7 @@ def _db_engine_lifespan(
     """Return a lifespan closing the engine's connections on exit."""
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
         yield
         engine.dispose()
 
