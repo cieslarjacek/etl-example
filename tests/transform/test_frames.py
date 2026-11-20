@@ -1,4 +1,4 @@
-from etl_example.transform import (
+from survey_etl.transform import (
     build_frame,
     frame_to_records,
 )

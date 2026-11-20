@@ -1,6 +1,6 @@
 import pytest
 
-from etl_example.validate import InvalidRow, IssueReason
+from survey_etl.validate import InvalidRow, IssueReason
 
 
 def test_invalid_row_cannot_be_changed() -> None:

@@ -1,6 +1,6 @@
 import pytest
 
-from etl_example.transform import CorrectedValue, CorrectionReason
+from survey_etl.transform import CorrectedValue, CorrectionReason
 
 
 def test_corrected_value_cannot_be_changed() -> None:

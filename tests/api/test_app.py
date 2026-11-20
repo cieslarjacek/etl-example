@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 
-from etl_example.load import (
+from survey_etl.storage import (
     RespondentConflictError,
     SurveyDatabase,
     define_tables,

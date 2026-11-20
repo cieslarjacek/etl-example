@@ -4,7 +4,7 @@ from types import MappingProxyType
 
 import pytest
 
-from etl_example.validate import (
+from survey_etl.validate import (
     CheckedRow,
     IssueReason,
     Rejection,

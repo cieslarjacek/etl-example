@@ -1,6 +1,6 @@
 from importlib import metadata
 
-import etl_example
+import survey_etl
 
 
 def test_package_is_installed_with_its_metadata() -> None:
@@ -11,4 +11,4 @@ def test_package_is_installed_with_its_metadata() -> None:
 
 
 def test_package_is_importable() -> None:
-    assert etl_example.__name__ == "etl_example"
+    assert survey_etl.__name__ == "survey_etl"

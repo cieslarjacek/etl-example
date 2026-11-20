@@ -3,10 +3,10 @@ import logging
 import pandas as pd
 import pytest
 
-from etl_example.load import SurveyDatabase
-from etl_example.pipeline import PipelineOptions, process_batch
-from etl_example.transform import TransformOutcome
-from etl_example.validate import IssueReason, check_values
+from survey_etl.pipeline import PipelineOptions, process_batch
+from survey_etl.storage import SurveyDatabase
+from survey_etl.transform import TransformOutcome
+from survey_etl.validate import IssueReason, check_values
 
 UNANSWERED = {
     "brand1_awareness": None,
@@ -126,7 +126,7 @@ def test_batch_outcome_is_logged(
     raw_row: dict[str, object],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.INFO, logger="etl_example")
+    caplog.set_level(logging.INFO, logger="survey_etl")
 
     process_batch([raw_row, raw_row], database)
 
@@ -141,7 +141,7 @@ def test_each_issue_is_logged_at_debug_level(
     raw_row: dict[str, object],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    caplog.set_level(logging.DEBUG, logger="etl_example")
+    caplog.set_level(logging.DEBUG, logger="survey_etl")
     inconsistent_row = raw_row | {
         "respondent_id": 3002,
         "brand3_awareness": 0,
