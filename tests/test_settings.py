@@ -2,7 +2,7 @@ import pickle
 
 import pytest
 
-from etl_example.settings import (
+from survey_etl.settings import (
     Environment,
     EnvironmentVariables,
     Settings,

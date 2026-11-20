@@ -6,8 +6,8 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
-from etl_example.api import create_app
-from etl_example.settings import DEFAULT_SETTINGS, Environment
+from survey_etl.api import create_app
+from survey_etl.settings import DEFAULT_SETTINGS, Environment
 
 
 def client_for(environment: Environment, database_url: str) -> TestClient:

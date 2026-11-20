@@ -29,6 +29,10 @@ dev = [
 requires = ["uv_build>=0.13.8,<0.14"]
 build-backend = "uv_build"
 
+[tool.uv.build-backend]
+# The distribution keeps the repository name; the module does not.
+module-name = "survey_etl"
+
 [tool.ruff]
 line-length = 79
 src = ["src", "tests"]
@@ -55,7 +59,7 @@ max-complexity = 5
 # The # SQL: comments show the plain SQL of each statement for the
 # presentation; ERA001 mistakes SQL such as COALESCE(SUM(x), 0) for
 # commented-out Python.
-"src/etl_example/load/*.py" = ["ERA001"]
+"src/survey_etl/storage/*.py" = ["ERA001"]
 
 [tool.mypy]
 strict = true
@@ -66,7 +70,7 @@ mypy_path = "$MYPY_CONFIG_FILE_DIR/src"
 [tool.pytest.ini_options]
 addopts = [
     "--strict-markers",
-    "--cov=etl_example",
+    "--cov=survey_etl",
     "--cov-report=term-missing",
     "--cov-fail-under=95",
 ]

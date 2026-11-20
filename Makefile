@@ -32,5 +32,5 @@ test: ## Run the test suite with coverage.
 check: lint typecheck test ## Run every check CI runs.
 
 run-dev: ## Serve the API locally in dev, reloading on code changes.
-	APP_ENV=dev uv run uvicorn etl_example.api.asgi:create_application \
+	APP_ENV=dev uv run uvicorn survey_etl.api.asgi:create_application \
 		--factory --reload

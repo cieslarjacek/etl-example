@@ -1,4 +1,4 @@
-from etl_example.transform import (
+from survey_etl.transform import (
     CorrectedValue,
     CorrectionReason,
     add_age_columns,

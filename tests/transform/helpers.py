@@ -4,8 +4,8 @@ from collections.abc import Mapping, Sequence
 
 import pandas as pd
 
-from etl_example.transform import build_frame
-from etl_example.validate import RowValidator, ValidRow
+from survey_etl.transform import build_frame
+from survey_etl.validate import RowValidator, ValidRow
 
 
 def valid_rows(raw_rows: Sequence[Mapping[str, object]]) -> list[ValidRow]:

@@ -1,7 +1,7 @@
 import datetime
 from collections.abc import Mapping, Sequence
 
-from etl_example.validate import (
+from survey_etl.validate import (
     CheckedRow,
     IssueReason,
     Rejection,
