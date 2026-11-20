@@ -4,10 +4,17 @@ import enum
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Annotated
+
+from pydantic import PlainSerializer
 
 __all__ = [
     "InvalidRow",
     "IssueReason",
+]
+
+type _ReceivedValues = Annotated[
+    Mapping[str, object], PlainSerializer(dict, return_type=dict[str, object])
 ]
 
 
@@ -34,7 +41,7 @@ class InvalidRow:
 
     row_number: int
     respondent_id: int | None
-    values: Mapping[str, object]
+    values: _ReceivedValues
     reason: IssueReason
     details: str
 

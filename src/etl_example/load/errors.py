@@ -2,6 +2,7 @@
 
 __all__ = [
     "RespondentConflictError",
+    "SummaryNotFoundError",
     "WaveNotFoundError",
 ]
 
@@ -40,4 +41,14 @@ class RespondentConflictError(RuntimeError):
         return (
             "respondent ID already stored, nothing from this batch was "
             f"saved ({self.database_message})"
+        )
+
+
+class SummaryNotFoundError(LookupError):
+    """No stored summary matches the selected waves and categories."""
+
+    def __str__(self) -> str:
+        """Explain that the selection matched nothing."""
+        return (
+            "no stored summary matches the selected waves and age categories"
         )

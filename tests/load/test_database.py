@@ -2,10 +2,13 @@ import pytest
 from sqlalchemy import create_engine, select
 
 from etl_example.load import (
+    AgeCategorySelection,
     BrandTotal,
     RespondentConflictError,
+    SummaryNotFoundError,
     SurveyDatabase,
     WaveNotFoundError,
+    WaveSelection,
     define_tables,
 )
 from tests.conftest import RecordsFactory
@@ -196,3 +199,106 @@ def test_age_categories_are_ordered_youngest_first(
 def test_unknown_wave_is_not_found(database: SurveyDatabase) -> None:
     with pytest.raises(WaveNotFoundError, match="wave 7"):
         database.read_wave_summary(7)
+
+
+# ---- read_summaries ----
+
+
+def load_three_waves(
+    database: SurveyDatabase,
+    raw_row: dict[str, object],
+    make_records: RecordsFactory,
+) -> None:
+    """Store waves 1 to 3, each with respondents aged 22 and 36."""
+    rows = [
+        raw_row
+        | {"wave": wave, "respondent_id": wave * 10 + offset}
+        | {"birth_year": birth_year}
+        for wave in (1, 2, 3)
+        for offset, birth_year in ((1, 2004), (2, 1990))
+    ]
+    database.load_new_respondents(make_records(rows))
+
+
+def summarised_waves(
+    database: SurveyDatabase,
+    waves: WaveSelection,
+    age_categories: AgeCategorySelection,
+) -> list[tuple[int, list[str]]]:
+    """Read summaries and keep each wave with its category labels."""
+    return [
+        (
+            summary.wave,
+            [category.age_category for category in summary.age_categories],
+        )
+        for summary in database.read_summaries(waves, age_categories)
+    ]
+
+
+@pytest.mark.parametrize(
+    ("waves", "expected_waves"),
+    [
+        (WaveSelection(), [1, 2, 3]),
+        (WaveSelection(number=2), [2]),
+        (WaveSelection(latest_count=2), [2, 3]),
+        (WaveSelection(start=2), [2, 3]),
+        (WaveSelection(end=2), [1, 2]),
+        (WaveSelection(start=1, end=2), [1, 2]),
+    ],
+)
+def test_read_summaries_selects_waves(
+    database: SurveyDatabase,
+    raw_row: dict[str, object],
+    make_records: RecordsFactory,
+    waves: WaveSelection,
+    expected_waves: list[int],
+) -> None:
+    load_three_waves(database, raw_row, make_records)
+
+    summaries = summarised_waves(database, waves, AgeCategorySelection())
+
+    assert [wave for wave, _ in summaries] == expected_waves
+
+
+@pytest.mark.parametrize(
+    ("age_categories", "expected_labels"),
+    [
+        (AgeCategorySelection(), ["18-24", "35-44"]),
+        (AgeCategorySelection(number=3), ["35-44"]),
+        (AgeCategorySelection(start=1, end=2), ["18-24"]),
+    ],
+)
+def test_read_summaries_selects_age_categories(
+    database: SurveyDatabase,
+    raw_row: dict[str, object],
+    make_records: RecordsFactory,
+    age_categories: AgeCategorySelection,
+    expected_labels: list[str],
+) -> None:
+    load_three_waves(database, raw_row, make_records)
+
+    summaries = summarised_waves(
+        database, WaveSelection(number=3), age_categories
+    )
+
+    assert summaries == [(3, expected_labels)]
+
+
+def test_read_summaries_without_match_is_not_found(
+    database: SurveyDatabase,
+    raw_row: dict[str, object],
+    make_records: RecordsFactory,
+) -> None:
+    load_three_waves(database, raw_row, make_records)
+
+    with pytest.raises(SummaryNotFoundError):
+        database.read_summaries(
+            WaveSelection(number=3), AgeCategorySelection(number=5)
+        )
+
+
+def test_read_summaries_of_empty_database_is_not_found(
+    database: SurveyDatabase,
+) -> None:
+    with pytest.raises(SummaryNotFoundError):
+        database.read_summaries(WaveSelection(), AgeCategorySelection())

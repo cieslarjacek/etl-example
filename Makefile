@@ -3,7 +3,7 @@ SHELL := bash
 .DEFAULT_GOAL := help
 MAKEFLAGS += --warn-undefined-variables --no-builtin-rules
 
-.PHONY: help install lock format lint typecheck test check
+.PHONY: help install lock format lint typecheck test check run-dev
 
 help: ## Show this help.
 	@grep -E '^[a-z-]+:.*## ' "$(firstword $(MAKEFILE_LIST))" \
@@ -30,3 +30,7 @@ test: ## Run the test suite with coverage.
 	uv run pytest
 
 check: lint typecheck test ## Run every check CI runs.
+
+run-dev: ## Serve the API locally in dev, reloading on code changes.
+	APP_ENV=dev uv run uvicorn etl_example.api.asgi:create_application \
+		--factory --reload
