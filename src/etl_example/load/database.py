@@ -9,6 +9,7 @@ parameters; the comments write them inline for readability.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
+from itertools import groupby
 
 from sqlalchemy import (
     Connection,
@@ -21,13 +22,18 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError
 
-from etl_example.load.errors import RespondentConflictError, WaveNotFoundError
-from etl_example.load.queries import summary_query
+from etl_example.load.errors import (
+    RespondentConflictError,
+    SummaryNotFoundError,
+    WaveNotFoundError,
+)
+from etl_example.load.queries import selected_summary_query, summary_query
 from etl_example.load.reports import (
     AgeCategorySummary,
     BrandTotal,
     WaveSummary,
 )
+from etl_example.load.selections import AgeCategorySelection, WaveSelection
 from etl_example.load.tables import SurveyTables
 from etl_example.survey import DataStatus
 
@@ -146,6 +152,46 @@ class SurveyDatabase:
 
         if not summary_rows:
             raise WaveNotFoundError(wave)
+
+        return self._wave_summary(wave, summary_rows)
+
+    def read_summaries(
+        self, waves: WaveSelection, age_categories: AgeCategorySelection
+    ) -> tuple[WaveSummary, ...]:
+        """Return the stored totals of the selected waves and ages.
+
+        Args:
+            waves: Waves to read.
+            age_categories: Age categories to read, by position.
+
+        Returns:
+            One summary per wave found, oldest wave first, each with
+            the selected categories, youngest first.
+
+        Raises:
+            InvalidSelectionError: If an age category position does
+                not exist.
+            SummaryNotFoundError: If no stored summary matches.
+        """
+        labels = age_categories.labels(self._tables.layout.age_categories)
+        query = selected_summary_query(self._tables, waves, labels)
+        with self._engine.connect() as connection:
+            summary_rows = connection.execute(query).mappings().all()
+
+        if not summary_rows:
+            raise SummaryNotFoundError
+        wave_column = self._tables.layout.columns.wave
+        rows_by_wave = groupby(summary_rows, key=lambda row: row[wave_column])
+
+        return tuple(
+            self._wave_summary(wave, list(wave_rows))
+            for wave, wave_rows in rows_by_wave
+        )
+
+    def _wave_summary(
+        self, wave: int, summary_rows: Sequence[RowMapping]
+    ) -> WaveSummary:
+        """Build a wave's summary, youngest age category first."""
         categories = map(self._category_summary, summary_rows)
 
         return WaveSummary(wave, tuple(sorted(categories, key=self._age_rank)))

@@ -1,4 +1,4 @@
-"""The query counting respondents and answers per wave.
+"""Queries counting answers per wave and reading the stored summaries.
 
 The ``# SQL:`` comments show the plain SQL each SQLAlchemy statement
 sends, for the column names of ``LAYOUT``. SQLAlchemy binds values as
@@ -8,12 +8,13 @@ parameters; the comments write them inline for readability.
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import Select, select
+from sqlalchemy import Column, ColumnElement, Select, select, true
 from sqlalchemy import func as sql_functions
 
+from etl_example.load.selections import WaveSelection
 from etl_example.load.tables import SurveyTables
 
-__all__ = ["summary_query"]
+__all__ = ["selected_summary_query", "summary_query"]
 
 
 def summary_query(
@@ -71,4 +72,71 @@ def summary_query(
         )
         .where(wave.in_(waves))
         .group_by(wave, age_category)
+    )
+
+
+def _wave_condition(
+    wave: Column[Any], selection: WaveSelection
+) -> ColumnElement[bool]:
+    """Build the WHERE condition for the selected waves."""
+    if selection.number is not None:
+        return wave == selection.number
+    if selection.latest_count is not None:
+        latest_waves = (
+            select(wave)
+            .distinct()
+            .order_by(wave.desc())
+            .limit(selection.latest_count)
+        )
+        return wave.in_(latest_waves.scalar_subquery())
+    condition: ColumnElement[bool] = true()
+    if selection.start is not None:
+        condition = condition & (wave >= selection.start)
+    if selection.end is not None:
+        condition = condition & (wave <= selection.end)
+
+    return condition
+
+
+def selected_summary_query(
+    tables: SurveyTables,
+    waves: WaveSelection,
+    age_category_labels: Sequence[str],
+) -> Select[*tuple[Any, ...]]:
+    """Build the query reading stored summaries of a selection.
+
+    Args:
+        tables: Survey table definitions.
+        waves: Waves to read.
+        age_category_labels: Labels of the age categories to read.
+
+    Returns:
+        A SELECT of summary rows, ordered by wave.
+    """
+    summary = tables.wave_summary
+    wave = summary.c[tables.layout.columns.wave]
+    age_category = summary.c[tables.layout.columns.age_category]
+
+    # SQL (wave_last=2, agecat_from=1, agecat_to=2):
+    #   SELECT
+    #       wave, age_category, respondents_total,
+    #       brand1_awareness_total, brand2_awareness_total,
+    #       brand3_awareness_total, brand1_usage_total,
+    #       brand2_usage_total, brand3_usage_total
+    #   FROM wave_summary
+    #   WHERE wave IN (
+    #           SELECT DISTINCT wave
+    #           FROM wave_summary
+    #           ORDER BY wave DESC
+    #           LIMIT 2
+    #       )
+    #       AND age_category IN ('18-24', '25-34')
+    #   ORDER BY wave;
+    # The wave condition is instead "wave = 3" for wave=3, and
+    # "wave >= 2 AND wave <= 3" for wave_from=2 and wave_to=3.
+    return (
+        select(summary)
+        .where(_wave_condition(wave, waves))
+        .where(age_category.in_(age_category_labels))
+        .order_by(wave)
     )
