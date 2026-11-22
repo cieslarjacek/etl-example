@@ -7,9 +7,9 @@ from typing import Final
 
 import pandas as pd
 
+from survey_etl.layout import LAYOUT, SurveyLayout
 from survey_etl.pipeline.reports import BatchReport
 from survey_etl.storage import SurveyDatabase
-from survey_etl.survey import LAYOUT, SurveyLayout
 from survey_etl.transform import (
     TRANSFORMERS,
     Transformer,

@@ -11,7 +11,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from survey_etl.survey import LAYOUT, SurveyLayout
+from survey_etl.layout import LAYOUT, SurveyLayout
 from survey_etl.validate.checks import (
     ROW_CHECKS,
     CheckedRow,

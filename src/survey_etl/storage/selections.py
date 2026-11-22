@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from dataclasses import astuple, dataclass
 
-from survey_etl.survey import AgeCategory
+from survey_etl.layout import AgeCategory
 
 __all__ = [
     "AgeCategorySelection",

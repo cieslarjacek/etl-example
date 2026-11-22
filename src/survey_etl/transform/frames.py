@@ -9,7 +9,7 @@ from typing import Final
 
 import pandas as pd
 
-from survey_etl.survey import LAYOUT, SurveyLayout
+from survey_etl.layout import LAYOUT, SurveyLayout
 from survey_etl.validate import ValidRow
 
 __all__ = [
