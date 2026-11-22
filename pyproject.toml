@@ -27,6 +27,13 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.17.5",
 ]
+notebook = [
+    "ipykernel>=7.4.0",
+]
+
+[tool.uv]
+# make install also installs the notebook kernel.
+default-groups = ["dev", "notebook"]
 
 [build-system]
 requires = ["uv_build>=0.13.8,<0.14"]
@@ -66,6 +73,8 @@ max-complexity = 5
 # expected values in assertions.
 "tests/**" = ["D100", "D103", "D104", "PLR2004", "S101", "TID251"]
 "src/survey_etl/**" = ["TID251"]
+# The notebook drives the service in-process and reads like a script.
+"notebooks/**" = ["D100", "TID251"]
 # The # SQL: comments show the plain SQL of each statement for the
 # presentation; ERA001 mistakes SQL such as COALESCE(SUM(x), 0) for
 # commented-out Python.
