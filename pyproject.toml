@@ -15,6 +15,9 @@ dependencies = [
     "uvicorn>=0.54.0",
 ]
 
+[project.scripts]
+survey-client = "survey_client.cli:main"
+
 [dependency-groups]
 dev = [
     "httpx2>=2.16.2",
@@ -30,8 +33,9 @@ requires = ["uv_build>=0.13.8,<0.14"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-# The distribution keeps the repository name; the module does not.
-module-name = "survey_etl"
+# The distribution keeps the repository name and ships two modules:
+# the service and the client that stands for an outside program.
+module-name = ["survey_etl", "survey_client"]
 
 [tool.ruff]
 line-length = 79
@@ -40,8 +44,13 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = [
     "A", "ANN", "B", "C4", "C90", "D", "E", "ERA", "F", "FBT", "I", "N",
-    "PL", "PT", "PTH", "RET", "RUF", "S", "SIM", "UP", "W",
+    "PL", "PT", "PTH", "RET", "RUF", "S", "SIM", "TID251", "UP", "W",
 ]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# The client stands for an outside program: it may use only the
+# service's HTTP API. Only the service and the tests import it.
+"survey_etl".msg = "only survey_etl and tests may import survey_etl"
 
 [tool.ruff.lint.pycodestyle]
 max-doc-length = 72
@@ -55,7 +64,8 @@ max-complexity = 5
 [tool.ruff.lint.per-file-ignores]
 # Tests: pytest's assert, no docstrings on test functions, literal
 # expected values in assertions.
-"tests/**" = ["D100", "D103", "D104", "PLR2004", "S101"]
+"tests/**" = ["D100", "D103", "D104", "PLR2004", "S101", "TID251"]
+"src/survey_etl/**" = ["TID251"]
 # The # SQL: comments show the plain SQL of each statement for the
 # presentation; ERA001 mistakes SQL such as COALESCE(SUM(x), 0) for
 # commented-out Python.
@@ -71,6 +81,7 @@ mypy_path = "$MYPY_CONFIG_FILE_DIR/src"
 addopts = [
     "--strict-markers",
     "--cov=survey_etl",
+    "--cov=survey_client",
     "--cov-report=term-missing",
     "--cov-fail-under=95",
 ]
