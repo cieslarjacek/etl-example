@@ -22,6 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError
 
+from survey_etl.layout import DataStatus
 from survey_etl.storage.errors import (
     RespondentConflictError,
     SummaryNotFoundError,
@@ -35,7 +36,6 @@ from survey_etl.storage.reports import (
 )
 from survey_etl.storage.selections import AgeCategorySelection, WaveSelection
 from survey_etl.storage.tables import SurveyTables
-from survey_etl.survey import DataStatus
 
 __all__ = ["SurveyDatabase"]
 

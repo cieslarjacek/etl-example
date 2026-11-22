@@ -1,11 +1,11 @@
 import pytest
 
+from survey_etl.layout import LAYOUT
 from survey_etl.storage import (
     AgeCategorySelection,
     InvalidSelectionError,
     WaveSelection,
 )
-from survey_etl.survey import LAYOUT
 
 CATEGORIES = LAYOUT.age_categories
 

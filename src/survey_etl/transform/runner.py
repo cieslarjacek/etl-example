@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from survey_etl.survey import LAYOUT, SurveyLayout
+from survey_etl.layout import LAYOUT, SurveyLayout
 from survey_etl.transform.frames import build_frame
 from survey_etl.transform.reports import CorrectedValue
 from survey_etl.transform.transformers import (

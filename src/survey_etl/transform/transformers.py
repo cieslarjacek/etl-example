@@ -10,7 +10,7 @@ from typing import Final
 
 import pandas as pd
 
-from survey_etl.survey import LAYOUT, DataStatus, SurveyLayout
+from survey_etl.layout import LAYOUT, DataStatus, SurveyLayout
 from survey_etl.transform.frames import NULLABLE_INTEGER
 from survey_etl.transform.reports import CorrectedValue, CorrectionReason
 

@@ -2,7 +2,7 @@ import pickle
 
 import pytest
 
-from survey_etl.survey import (
+from survey_etl.layout import (
     LAYOUT,
     AgeCategory,
     AgeOutOfRangeError,

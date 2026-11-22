@@ -10,7 +10,7 @@ from typing import Final
 
 from sqlalchemy import Column, Integer, MetaData, String, Table
 
-from survey_etl.survey import LAYOUT, SurveyLayout
+from survey_etl.layout import LAYOUT, SurveyLayout
 
 __all__ = [
     "TABLE_NAMES",

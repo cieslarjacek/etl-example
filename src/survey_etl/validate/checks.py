@@ -19,7 +19,7 @@ from pydantic import (
     create_model,
 )
 
-from survey_etl.survey import LAYOUT, SurveyLayout
+from survey_etl.layout import LAYOUT, SurveyLayout
 from survey_etl.validate.reports import IssueReason
 
 __all__ = [
