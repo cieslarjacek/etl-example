@@ -8,8 +8,8 @@ MAKEFLAGS += --warn-undefined-variables --no-builtin-rules
 IMAGE ?= etl-example:local
 ENV ?= dev
 
-.PHONY: help install lock format lint typecheck test check run-dev \
-	docker-build docker-run docker-stop
+.PHONY: help install lock format lint typecheck test test-integration \
+	check run-dev docker-build docker-run docker-stop
 
 help: ## Show this help.
 	@grep -E '^[a-z-]+:.*## ' "$(firstword $(MAKEFILE_LIST))" \
@@ -25,9 +25,11 @@ format: ## Format code and sort imports.
 	uv run ruff check --select I --fix
 	uv run ruff format
 
-lint: ## Lint and check formatting with ruff.
+lint: ## Lint Python with ruff, the Dockerfile and the shell scripts.
 	uv run ruff check
 	uv run ruff format --check
+	uv run hadolint Dockerfile
+	uv run shellcheck scripts/*.sh
 
 typecheck: ## Type-check with mypy --strict.
 	uv run mypy
@@ -35,7 +37,10 @@ typecheck: ## Type-check with mypy --strict.
 test: ## Run the test suite with coverage.
 	uv run pytest
 
-check: lint typecheck test ## Run every check CI runs.
+test-integration: ## Test the IMAGE in Docker containers (build it first).
+	INTEGRATION_IMAGE="$(IMAGE)" uv run pytest -m integration --no-cov
+
+check: lint typecheck test ## Run the checks of the CI check job.
 
 # Use for writing or debugging code.
 run-dev: ## Serve the API locally in dev, reloading on code changes.
