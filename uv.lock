@@ -326,6 +326,7 @@ dev = [
     { name = "ruff" },
 ]
 notebook = [
+    { name = "httpx2" },
     { name = "ipykernel" },
 ]
 
@@ -347,7 +348,10 @@ dev = [
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "ruff", specifier = ">=0.17.5" },
 ]
-notebook = [{ name = "ipykernel", specifier = ">=7.4.0" }]
+notebook = [
+    { name = "httpx2", specifier = ">=2.16.2" },
+    { name = "ipykernel", specifier = ">=7.4.0" },
+]
 
 [[package]]
 name = "executing"
