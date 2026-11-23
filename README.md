@@ -216,17 +216,17 @@ starts a container on port 8000 (dev) or 8001 (prod), bound to
 
 ```mermaid
 flowchart LR
-    pr["Pull Request<br/>to <code>develop</code>"] --> check["Run checks"]
+    pr["`Pull Request<br/>to <code>develop</code>`"] --> check["Run checks"]
     pr --> image["Build image"]
     image --> integration["Integration tests"]
     %% A longer link (--->) keeps make check in the same column as
     %% Build image instead of next to Integration tests.
-    check ---> merge{"merge"}
+    check ---> merge{"Merge Pull Request"}
     integration --> merge
     merge --> publish["build, push<br/>tag dev-commit"]
-    publish --> dev["Deploy to dev<br/>smoke test"]
-    dev --> approval{"approval<br/>in prod environment"}
-    approval --> prod["Deploy to prod<br/>tag prod-version"]
+    publish --> dev["`Deploy to <code>dev</code><br/>smoke test`"]
+    dev --> approval{"`Approval<br/>in <code>prod</code> environment`"}
+    approval --> prod["`Deploy to <code>prod</code><br/>tag prod-version`"]
 ```
 
 - **CI** (`.github/workflows/ci.yml`) runs on every pull request into
