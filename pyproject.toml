@@ -28,6 +28,7 @@ dev = [
     "ruff>=0.17.5",
 ]
 notebook = [
+    "httpx2>=2.16.2",
     "ipykernel>=7.4.0",
 ]
 
