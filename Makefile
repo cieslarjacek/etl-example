@@ -3,7 +3,13 @@ SHELL := bash
 .DEFAULT_GOAL := help
 MAKEFLAGS += --warn-undefined-variables --no-builtin-rules
 
-.PHONY: help install lock format lint typecheck test check run-dev
+# Service image and container settings; override on the command line,
+# for example: make docker-run ENV=prod
+IMAGE ?= etl-example:local
+ENV ?= dev
+
+.PHONY: help install lock format lint typecheck test check run-dev \
+	docker-build docker-run docker-stop
 
 help: ## Show this help.
 	@grep -E '^[a-z-]+:.*## ' "$(firstword $(MAKEFILE_LIST))" \
@@ -31,6 +37,16 @@ test: ## Run the test suite with coverage.
 
 check: lint typecheck test ## Run every check CI runs.
 
+# Use for writing or debugging code.
 run-dev: ## Serve the API locally in dev, reloading on code changes.
 	APP_ENV=dev uv run uvicorn survey_etl.api.asgi:create_application \
 		--factory --reload
+
+docker-build: ## Build the service image as IMAGE.
+	docker build --tag "$(IMAGE)" .
+
+docker-run: ## Start the ENV (dev or prod) container from IMAGE.
+	scripts/run-container.sh "$(ENV)" "$(IMAGE)"
+
+docker-stop: ## Stop and remove the ENV container; its volume stays.
+	docker rm --force "etl-example-$(ENV)"
