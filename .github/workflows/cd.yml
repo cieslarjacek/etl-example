@@ -1,0 +1,167 @@
+# Delivers every merge into develop: builds the image once, pushes it to
+# the GitHub Container Registry as dev-<commit>, deploys it to dev, and,
+# after approval in the prod environment, promotes the same image to
+# prod-<version>. There are no servers yet: each deploy job smoke-tests
+# the image on the runner where a real deploy command would go.
+name: CD
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build and push image
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.names.outputs.image }}
+      version: ${{ steps.names.outputs.version }}
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Name the image and read the project version
+        id: names
+        run: |
+          # Registry names must be lowercase; ${VAR,,} lowercases.
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "${GITHUB_OUTPUT}"
+          version="$(python3 -c 'import tomllib
+          with open("pyproject.toml", "rb") as file:
+              print(tomllib.load(file)["project"]["version"])')"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to the GitHub Container Registry
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push dev-<commit>
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.names.outputs.image }}:dev-${{ github.sha }}
+          # source links the package to this repository on GitHub.
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.names.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-dev:
+    name: Deploy to dev
+    needs: publish
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    environment: dev
+    # One dev deployment at a time; a running one is never cancelled.
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    env:
+      # The digest pins the exact image pushed above.
+      IMAGE: ${{ needs.publish.outputs.image }}@${{ needs.publish.outputs.digest }}
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Log in to the GitHub Container Registry
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Placeholder: a real deployment would start IMAGE on the dev
+      # server here. The smoke test starts it on the runner instead.
+      - name: Smoke-test the image as dev
+        run: scripts/smoke-test.sh dev "${IMAGE}"
+
+      - name: Record the deployment
+        run: |
+          {
+            echo "### Deployed to dev"
+            echo "Image: \`${IMAGE}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  deploy-prod:
+    name: Deploy to prod
+    needs: [publish, deploy-dev]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    # The prod environment's required reviewers approve this job.
+    environment: prod
+    # Kept apart from dev, so a prod approval still waiting does not
+    # hold back dev deployments of later merges.
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ${{ needs.publish.outputs.image }}@${{ needs.publish.outputs.digest }}
+      PROD_TAG: ${{ needs.publish.outputs.image }}:prod-${{ needs.publish.outputs.version }}
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to the GitHub Container Registry
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A released prod tag is never moved: a new release needs a new
+      # version in pyproject.toml.
+      - name: Check that the prod tag is new
+        run: |
+          if docker buildx imagetools inspect "${PROD_TAG}" >/dev/null 2>&1; then
+            echo "::error::${PROD_TAG} already exists; bump the version in pyproject.toml"
+            exit 1
+          fi
+
+      - name: Smoke-test the image as prod
+        run: scripts/smoke-test.sh prod "${IMAGE}"
+
+      # Adds the prod tag to the image tested in dev, without a rebuild:
+      # both tags name the same digest.
+      - name: Promote the image to prod-<version>
+        run: docker buildx imagetools create --tag "${PROD_TAG}" "${IMAGE}"
+
+      # Placeholder: a real deployment would start PROD_TAG on the prod
+      # server here.
+      - name: Record the deployment
+        run: |
+          {
+            echo "### Deployed to prod"
+            echo "Image: \`${PROD_TAG}\` (\`${IMAGE}\`)"
+          } >> "${GITHUB_STEP_SUMMARY}"
