@@ -11,7 +11,7 @@ from survey_etl.storage import (
     WaveSelection,
     define_tables,
 )
-from tests.conftest import RecordsFactory
+from tests.survey_etl.conftest import RecordsFactory
 
 
 def rows_for_wave(

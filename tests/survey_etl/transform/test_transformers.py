@@ -6,7 +6,7 @@ from survey_etl.transform import (
     format_interview_dates,
     tag_as_new,
 )
-from tests.transform.helpers import frame_of
+from tests.survey_etl.transform.helpers import frame_of
 
 # ---- correct_usage_without_awareness ----
 
