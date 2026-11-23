@@ -53,8 +53,11 @@ docker-build: ## Build the service image as IMAGE.
 docker-run: ## Start the ENV (dev or prod) container from IMAGE.
 	scripts/run-container.sh "$(ENV)" "$(IMAGE)"
 
-docker-stop: ## Stop and remove the ENV container; its volume stays.
-	docker rm --force "etl-example-$(ENV)"
+# `docker stop` sends SIGTERM and waits, so uvicorn finishes open requests
+# and closes the database before the container is removed.
+docker-stop: ## Stop the ENV container cleanly and remove it; its volume stays.
+	docker stop "etl-example-$(ENV)"
+	docker rm "etl-example-$(ENV)"
 
 smoke-test: ## Start IMAGE as ENV and check /health and /docs, as CD does.
 	scripts/smoke-test.sh "$(ENV)" "$(IMAGE)"
