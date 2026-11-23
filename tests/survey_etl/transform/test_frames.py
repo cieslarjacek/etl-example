@@ -2,7 +2,7 @@ from survey_etl.transform import (
     build_frame,
     frame_to_records,
 )
-from tests.transform.helpers import frame_of
+from tests.survey_etl.transform.helpers import frame_of
 
 # ---- build_frame ----
 

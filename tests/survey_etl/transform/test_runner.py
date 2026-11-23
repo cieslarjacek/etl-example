@@ -6,7 +6,7 @@ from survey_etl.transform import (
     TransformOutcome,
     transform_rows,
 )
-from tests.transform.helpers import valid_rows
+from tests.survey_etl.transform.helpers import valid_rows
 
 
 def test_transform_derives_all_stored_columns(
