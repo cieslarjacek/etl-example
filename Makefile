@@ -9,7 +9,7 @@ IMAGE ?= etl-example:local
 ENV ?= dev
 
 .PHONY: help install lock format lint typecheck test test-integration \
-	check run-dev docker-build docker-run docker-stop
+	check run-dev docker-build docker-run docker-stop smoke-test
 
 help: ## Show this help.
 	@grep -E '^[a-z-]+:.*## ' "$(firstword $(MAKEFILE_LIST))" \
@@ -55,3 +55,6 @@ docker-run: ## Start the ENV (dev or prod) container from IMAGE.
 
 docker-stop: ## Stop and remove the ENV container; its volume stays.
 	docker rm --force "etl-example-$(ENV)"
+
+smoke-test: ## Start IMAGE as ENV and check /health and /docs, as CD does.
+	scripts/smoke-test.sh "$(ENV)" "$(IMAGE)"
