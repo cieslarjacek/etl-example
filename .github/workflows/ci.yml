@@ -1,0 +1,121 @@
+# Checks every pull request into develop: the same `make check` as on a
+# developer machine, a build of the service image (not pushed) and,
+# once the image is built, integration tests against it in Docker.
+name: CI
+
+on:
+  pull_request:
+    branches: [develop]
+
+# The jobs only read the repository.
+permissions:
+  contents: read
+
+# A new push to the same pull request cancels the run still going.
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: make check
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No git credentials are needed after the checkout.
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          # The uv version the Dockerfile uses.
+          version: "0.13.9"
+          # Keep downloaded packages between runs, keyed on uv.lock.
+          enable-cache: true
+
+      # uv installs the Python version named in .python-version.
+      - name: Install Python and the locked dependencies
+        run: make install
+
+      - name: Lint, type-check and test
+        run: make check
+
+  image:
+    name: Build image
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build the service image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          # The checked-out folder, so .dockerignore applies as locally.
+          context: .
+          tags: etl-example:ci
+          # Save the image as a file for the integration job.
+          outputs: type=docker,dest=${{ runner.temp }}/etl-example-image.tar
+          # Reuse layers from earlier runs through the Actions cache.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Keep the image for the integration job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: service-image
+          path: ${{ runner.temp }}/etl-example-image.tar
+          if-no-files-found: error
+          # Only this run needs it.
+          retention-days: 1
+
+  integration:
+    name: Integration tests
+    needs: image
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.13.9"
+          enable-cache: true
+
+      - name: Install Python and the locked dependencies
+        run: make install
+
+      - name: Fetch the image built by the image job
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: service-image
+          path: ${{ runner.temp }}
+
+      - name: Load the image into Docker
+        run: docker load --input "${RUNNER_TEMP}/etl-example-image.tar"
+
+      - name: Run the integration tests
+        run: make test-integration IMAGE=etl-example:ci
+        env:
+          # The tests save each container's log here.
+          INTEGRATION_LOG_DIRECTORY: ${{ runner.temp }}/container-logs
+
+      - name: Keep the container logs of a failed run
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: container-logs
+          path: ${{ runner.temp }}/container-logs
+          if-no-files-found: ignore
