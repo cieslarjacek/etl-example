@@ -7,11 +7,10 @@ from survey_etl.storage import (
     RespondentConflictError,
     SummaryNotFoundError,
     SurveyDatabase,
-    WaveNotFoundError,
     WaveSelection,
     define_tables,
 )
-from tests.survey_etl.conftest import RecordsFactory
+from tests.survey_etl.conftest import RecordsFactory, read_wave
 
 
 def rows_for_wave(
@@ -56,7 +55,7 @@ def test_late_row_refreshes_its_earlier_wave(
         make_records(rows_for_wave(raw_row, 2, range(3, 4)))
     )
 
-    summary = database.read_wave_summary(2)
+    summary = read_wave(database, 2)
     assert summary.age_categories[0].respondents_total == 3
 
 
@@ -73,7 +72,7 @@ def test_load_leaves_other_waves_untouched(
         make_records(rows_for_wave(raw_row, 2, range(3, 4)))
     )
 
-    summary = database.read_wave_summary(1)
+    summary = read_wave(database, 1)
     assert summary.age_categories[0].respondents_total == 2
 
 
@@ -83,11 +82,11 @@ def test_empty_load_keeps_summaries_unchanged(
     make_records: RecordsFactory,
 ) -> None:
     database.load_new_respondents(make_records([raw_row]))
-    summary_before = database.read_wave_summary(3)
+    summary_before = read_wave(database, 3)
 
     database.load_new_respondents(())
 
-    assert database.read_wave_summary(3) == summary_before
+    assert read_wave(database, 3) == summary_before
 
 
 def test_storing_an_id_twice_is_a_conflict(
@@ -108,13 +107,13 @@ def test_conflicting_load_stores_nothing(
     make_records: RecordsFactory,
 ) -> None:
     database.load_new_respondents(make_records([raw_row]))
-    summary_before = database.read_wave_summary(3)
+    summary_before = read_wave(database, 3)
     new_row = raw_row | {"respondent_id": 3002}
 
     with pytest.raises(RespondentConflictError):
         database.load_new_respondents(make_records([new_row, raw_row]))
 
-    assert database.read_wave_summary(3) == summary_before
+    assert read_wave(database, 3) == summary_before
 
 
 # ---- stored_respondent_ids ----
@@ -138,7 +137,7 @@ def test_stored_respondent_ids_of_no_ids_are_empty(
     assert database.stored_respondent_ids([]) == frozenset()
 
 
-# ---- read_wave_summary ----
+# ---- summary totals ----
 
 
 def test_summary_counts_respondents_and_answers(
@@ -153,7 +152,7 @@ def test_summary_counts_respondents_and_answers(
     }
     database.load_new_respondents(make_records([raw_row, unaware_row]))
 
-    summary = database.read_wave_summary(3)
+    summary = read_wave(database, 3)
 
     category = summary.age_categories[0]
     assert category.age_category == "35-44"
@@ -173,7 +172,7 @@ def test_unanswered_questions_are_not_counted(
     raw_row |= {"brand1_awareness": None, "brand1_usage": None}
     database.load_new_respondents(make_records([raw_row]))
 
-    summary = database.read_wave_summary(3)
+    summary = read_wave(database, 3)
 
     assert summary.age_categories[0].brands[0] == BrandTotal("brand1", 0, 0)
 
@@ -190,15 +189,10 @@ def test_age_categories_are_ordered_youngest_first(
     ]
     database.load_new_respondents(make_records(rows))
 
-    summary = database.read_wave_summary(3)
+    summary = read_wave(database, 3)
 
     labels = [category.age_category for category in summary.age_categories]
     assert labels == ["25-34", "35-44", "55+"]
-
-
-def test_unknown_wave_is_not_found(database: SurveyDatabase) -> None:
-    with pytest.raises(WaveNotFoundError, match="wave 7"):
-        database.read_wave_summary(7)
 
 
 # ---- read_summaries ----

@@ -8,7 +8,13 @@ from typing import Final
 import pytest
 from sqlalchemy import create_engine
 
-from survey_etl.storage import SurveyDatabase, define_tables
+from survey_etl.storage import (
+    AgeCategorySelection,
+    SurveyDatabase,
+    WaveSelection,
+    WaveSummary,
+    define_tables,
+)
 from survey_etl.transform import frame_to_records, transform_rows
 from survey_etl.validate import RowValidator
 
@@ -26,6 +32,15 @@ VALID_RAW_ROW: Final = MappingProxyType(
         "brand3_usage": 0,
     }
 )
+
+
+def read_wave(database: SurveyDatabase, wave: int) -> WaveSummary:
+    """The stored summary of one wave, all age categories."""
+    (wave_summary,) = database.read_summaries(
+        WaveSelection(number=wave), AgeCategorySelection()
+    )
+    return wave_summary
+
 
 type RecordsFactory = Callable[
     [Sequence[Mapping[str, object]]], tuple[dict[str, object], ...]

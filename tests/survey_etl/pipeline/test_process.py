@@ -7,6 +7,7 @@ from survey_etl.pipeline import PipelineOptions, process_batch
 from survey_etl.storage import SurveyDatabase
 from survey_etl.transform import TransformOutcome
 from survey_etl.validate import IssueReason, check_values
+from tests.survey_etl.conftest import read_wave
 
 UNANSWERED = {
     "brand1_awareness": None,
@@ -25,7 +26,7 @@ def test_valid_batch_is_loaded_and_summarised(
 
     assert report.rows_loaded == 1
     assert report.refreshed_waves == (3,)
-    summary = database.read_wave_summary(3)
+    summary = read_wave(database, 3)
     assert summary.age_categories[0].respondents_total == 1
 
 
@@ -116,9 +117,7 @@ def test_injected_steps_replace_the_defaults(
     report = process_batch([raw_row | {"birth_year": 2010}], database, options)
 
     assert report.rows_loaded == 1
-    assert database.read_wave_summary(3).age_categories[0].age_category == (
-        "35-44"
-    )
+    assert read_wave(database, 3).age_categories[0].age_category == "35-44"
 
 
 def test_batch_outcome_is_logged(

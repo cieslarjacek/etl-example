@@ -6,14 +6,12 @@ from survey_etl.storage import (
     InvalidSelectionError,
     RespondentConflictError,
     SummaryNotFoundError,
-    WaveNotFoundError,
 )
 
 
 @pytest.mark.parametrize(
     "error",
     [
-        WaveNotFoundError(7),
         RespondentConflictError("UNIQUE failed"),
         SummaryNotFoundError(),
         InvalidSelectionError("wave range starts at 3, after its end 2"),

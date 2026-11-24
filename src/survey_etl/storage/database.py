@@ -26,7 +26,6 @@ from survey_etl.layout import DataStatus
 from survey_etl.storage.errors import (
     RespondentConflictError,
     SummaryNotFoundError,
-    WaveNotFoundError,
 )
 from survey_etl.storage.queries import selected_summary_query, summary_query
 from survey_etl.storage.reports import (
@@ -122,38 +121,6 @@ class SurveyDatabase:
                 _mark_rows_current(connection, self._tables)
         except IntegrityError as error:
             raise RespondentConflictError(str(error.orig)) from error
-
-    def read_wave_summary(self, wave: int) -> WaveSummary:
-        """Return the stored totals of a wave per age category.
-
-        Args:
-            wave: Wave number.
-
-        Returns:
-            The wave's totals, youngest age category first.
-
-        Raises:
-            WaveNotFoundError: If no summary is stored for the wave.
-        """
-        summary = self._tables.wave_summary
-        # SQL (for wave 3):
-        #   SELECT
-        #       wave, age_category, respondents_total,
-        #       brand1_awareness_total, brand2_awareness_total,
-        #       brand3_awareness_total, brand1_usage_total,
-        #       brand2_usage_total, brand3_usage_total
-        #   FROM wave_summary
-        #   WHERE wave = 3;
-        query = select(summary).where(
-            summary.c[self._tables.layout.columns.wave] == wave
-        )
-        with self._engine.connect() as connection:
-            summary_rows = connection.execute(query).mappings().all()
-
-        if not summary_rows:
-            raise WaveNotFoundError(wave)
-
-        return self._wave_summary(wave, summary_rows)
 
     def read_summaries(
         self, waves: WaveSelection, age_categories: AgeCategorySelection

@@ -3,25 +3,7 @@
 __all__ = [
     "RespondentConflictError",
     "SummaryNotFoundError",
-    "WaveNotFoundError",
 ]
-
-
-class WaveNotFoundError(LookupError):
-    """No summary is stored for the requested wave."""
-
-    def __init__(self, wave: int) -> None:
-        """Store the wave that was requested.
-
-        Args:
-            wave: Wave number.
-        """
-        super().__init__(wave)
-        self.wave = wave
-
-    def __str__(self) -> str:
-        """Name the missing wave."""
-        return f"no summary stored for wave {self.wave}"
 
 
 class RespondentConflictError(RuntimeError):

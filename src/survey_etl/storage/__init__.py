@@ -4,7 +4,6 @@ from survey_etl.storage.database import SurveyDatabase
 from survey_etl.storage.errors import (
     RespondentConflictError,
     SummaryNotFoundError,
-    WaveNotFoundError,
 )
 from survey_etl.storage.queries import selected_summary_query, summary_query
 from survey_etl.storage.reports import (
@@ -35,7 +34,6 @@ __all__ = [
     "SurveyDatabase",
     "SurveyTables",
     "TableNames",
-    "WaveNotFoundError",
     "WaveSelection",
     "WaveSummary",
     "define_tables",
