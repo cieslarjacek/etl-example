@@ -1,8 +1,5 @@
 # etl-example
 
-[![CI](https://github.com/cieslarjacek/etl-example/actions/workflows/ci.yml/badge.svg)](https://github.com/cieslarjacek/etl-example/actions/workflows/ci.yml)
-[![CD](https://github.com/cieslarjacek/etl-example/actions/workflows/cd.yml/badge.svg?branch=develop)](https://github.com/cieslarjacek/etl-example/actions/workflows/cd.yml)
-
 Tracking-survey ETL API example: validate, clean, transform, load
 and summarise survey waves.
 
