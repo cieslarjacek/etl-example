@@ -9,7 +9,7 @@ from survey_client import (
     batches_url,
     post_json,
 )
-from tests.survey_client.conftest import LOOPBACK_HOST, ServerFactory
+from tests.unit.survey_client.conftest import LOOPBACK_HOST, ServerFactory
 
 # ---- HttpReply ----
 

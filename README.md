@@ -253,7 +253,8 @@ src/survey_etl/          the service
     pipeline/            one batch through validate, transform, storage
     api/                 FastAPI app, routes and ASGI entry point
 src/survey_client/       CSV to batch JSON, and upload over HTTP
-tests/                   unit tests by package; integration/ for Docker
+tests/unit/              unit tests, mirroring the packages
+tests/integration/       tests of the Docker image
 data/                    sample waves
 notebooks/               local_scenario and docker_scenario
 scripts/                 run-container.sh, smoke-test.sh

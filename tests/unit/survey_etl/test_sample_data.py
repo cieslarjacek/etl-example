@@ -13,9 +13,9 @@ from fastapi.testclient import TestClient
 
 from survey_client import build_batch_body, parse_survey_csv
 from survey_etl.settings import Environment
-from tests.survey_etl.api.conftest import client_for
+from tests.unit.survey_etl.api.conftest import client_for
 
-DATA_DIRECTORY = Path(__file__).parents[2] / "data"
+DATA_DIRECTORY = Path(__file__).parents[3] / "data"
 
 
 def upload_file(client: TestClient, file_name: str) -> dict[str, Any]:

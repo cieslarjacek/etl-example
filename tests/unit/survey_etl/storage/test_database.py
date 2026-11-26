@@ -10,7 +10,7 @@ from survey_etl.storage import (
     WaveSelection,
     define_tables,
 )
-from tests.survey_etl.conftest import RecordsFactory, read_wave
+from tests.unit.survey_etl.conftest import RecordsFactory, read_wave
 
 
 def rows_for_wave(
