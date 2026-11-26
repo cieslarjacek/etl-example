@@ -7,7 +7,7 @@ from survey_etl.pipeline import PipelineOptions, process_batch
 from survey_etl.storage import SurveyDatabase
 from survey_etl.transform import TransformOutcome
 from survey_etl.validate import IssueReason, check_values
-from tests.survey_etl.conftest import read_wave
+from tests.unit.survey_etl.conftest import read_wave
 
 UNANSWERED = {
     "brand1_awareness": None,
